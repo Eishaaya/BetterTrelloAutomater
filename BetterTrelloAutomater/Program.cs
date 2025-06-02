@@ -13,10 +13,11 @@ namespace BetterTrelloAutomater
 {
     internal class Program
     {
-        public static async Task Main()
+        public static void Main()
         {
             var host = new HostBuilder()
-            .ConfigureAppConfiguration(m =>
+                .ConfigureFunctionsWorkerDefaults()
+                        .ConfigureAppConfiguration(m =>
             {
                 m.AddJsonFile("local.settings.json");
                 m.AddEnvironmentVariables();
@@ -35,9 +36,7 @@ namespace BetterTrelloAutomater
             })
             .Build();
 
-            var trello = host.Services.GetRequiredService<TrelloClient>();
-            var id = await trello.GetPersonalBoardID();
-
+            host.Run();
         }
     }
 }
