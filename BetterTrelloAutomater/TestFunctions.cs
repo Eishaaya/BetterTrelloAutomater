@@ -23,7 +23,7 @@ namespace BetterTrelloAutomater
         {
             log.LogInformation("Getting list IDs");
 
-
+            throw new NotImplementedException();
             //return new OkObjectResult(responseMessage);
         }
     }
