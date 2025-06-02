@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "BetterTrelloAutomater": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7070",
+      "launchBrowser": false
+    }
+  }
+}
