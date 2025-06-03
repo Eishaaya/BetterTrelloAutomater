@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BetterTrelloAutomater
+namespace BetterTrelloAutomator
 {
     internal class Program
     {
