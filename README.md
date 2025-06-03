@@ -1,0 +1,1 @@
+Small project built to automate my personal trello board. It shifts tasks over an array of lists representing the week, automatically finds and moves due tasks into that array, and cycles routine tasks around into their correct spots.
