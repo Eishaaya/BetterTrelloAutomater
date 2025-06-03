@@ -40,8 +40,8 @@ namespace BetterTrelloAutomator
 
         public async Task<string> GetPersonalBoardID()
         {
-            var url = "members/me/boards?fields=name,id" + authString;
-            logger.LogInformation("CALLING @:" + client.BaseAddress + url);
+            var url = "members/me/boards?fields=name,id";
+            var boards = await GetResponse(url);
             var response = await client.GetAsync(url);
             
             response.EnsureSuccessStatusCode();
@@ -62,8 +62,8 @@ namespace BetterTrelloAutomator
 
         public async Task<SimplifiedTrelloRecord[]> GetLists (int startingIndex = 0, int endingIndex = int.MaxValue)
         {
-            var url = $"boards/{boardID}/lists?fields=name,id" + authString;
-            var response = await client.GetAsync(url);
+            var url = $"boards/{boardID}/lists?fields=name,id";
+            var body = await GetResponse(url);
             response.EnsureSuccessStatusCode();
             var body = await response.Content.ReadAsStringAsync();
 
@@ -79,6 +79,13 @@ namespace BetterTrelloAutomator
             response.EnsureSuccessStatusCode();
         }
 
+
+        async Task<string> GetResponse(string url)
+        {
+            var response = await client.GetAsync(url + authString);
+            response.EnsureSuccessStatusCode();
+            return await response?.Content.ReadAsStringAsync();
+        }
     }
 
     record class SimplifiedTrelloRecord(string Name, string Id);
