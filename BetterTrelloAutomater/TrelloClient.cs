@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -22,13 +23,14 @@ namespace BetterTrelloAutomator
         ILogger<TrelloClient> logger;
 
         JsonSerializerOptions caseInsensitive = new JsonSerializerOptions() { PropertyNameCaseInsensitive = true };
+        JsonSerializerOptions webOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
         public TrelloClient(HttpClient httpClient, IConfiguration config, ILogger<TrelloClient> myLogger)
         {
             key = config["TRELLO_KEY"] ?? throw new ArgumentNullException("FAILED TO LOAD KEY");
             token = config["TRELLO_TOKEN"] ?? throw new ArgumentNullException("FAILED TO LOAD TOKEN");
 
-            authString = $"&key={key}&token={token}";
+            authString = $"key={key}&token={token}";
 
             client = httpClient;
             client.BaseAddress = new Uri("https://api.trello.com/1/");
@@ -38,15 +40,11 @@ namespace BetterTrelloAutomator
             logger.LogInformation("Trello client made");
         }
 
+        #region utility
         public async Task<string> GetPersonalBoardID()
         {
-            var url = "members/me/boards?fields=name,id";
+            var url = "members/me/boards?fields=name,id&";
             var boards = await GetResponse(url);
-            var response = await client.GetAsync(url);
-            
-            response.EnsureSuccessStatusCode();
-
-            var boards = await response.Content.ReadAsStringAsync();
 
             var usableBoards = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(boards, caseInsensitive);
             foreach (var board in usableBoards)
@@ -60,33 +58,52 @@ namespace BetterTrelloAutomator
             throw new InvalidOperationException("Failed to find personal board!");
         }
 
-        public async Task<SimplifiedTrelloRecord[]> GetLists (int startingIndex = 0, int endingIndex = int.MaxValue)
+        public async Task<SimplifiedTrelloRecord[]> GetLists(int startingIndex = 0, int endingIndex = int.MaxValue)
         {
-            var url = $"boards/{boardID}/lists?fields=name,id";
+            var url = $"boards/{boardID}/lists?fields=name,id&";
             var body = await GetResponse(url);
-            response.EnsureSuccessStatusCode();
-            var body = await response.Content.ReadAsStringAsync();
 
             var lists = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(body, caseInsensitive).Where((_, i) => i >= startingIndex && i <= endingIndex);
 
             return lists.ToArray();
         }
 
-        public async Task MoveCards(string fromID, string toID)
+        async Task<string> GetResponse(string uri)
         {
-            var url = $"lists/{fromID}/moveAllCards?idBoard={boardID}&idList={toID}" + authString;
-            var response = await client.PostAsync(url, null); 
+            var response = await client.GetAsync(uri + authString);
+            response.EnsureSuccessStatusCode();
+            return await response?.Content.ReadAsStringAsync();
+        }
+
+        #endregion
+
+        public async Task MoveCards(SimplifiedTrelloRecord from, SimplifiedTrelloRecord to)
+        {
+            var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}&" + authString;
+            var response = await client.PostAsync(uri, null);
             response.EnsureSuccessStatusCode();
         }
 
-
-        async Task<string> GetResponse(string url)
+        public async Task<SimplifiedTrelloCard[]> GetCards(SimplifiedTrelloRecord list)
         {
-            var response = await client.GetAsync(url + authString);
+            var response = await GetResponse($"lists/{list.Id}/cards?fields=name,id,start,due&");
+            return JsonSerializer.Deserialize<SimplifiedTrelloCard[]>(response, caseInsensitive);
+        }
+
+        public async Task MoveCard(SimplifiedTrelloCard card, ListPosition position)
+        {
+            var uri = $"cards/{card.Id}?" + authString;
+            var content = new FormUrlEncodedContent([
+                new ("idList", position.ListId),
+                new ("pos", position.Pos)
+            ]);
+            
+            var response = await client.PutAsync(uri, content);
             response.EnsureSuccessStatusCode();
-            return await response?.Content.ReadAsStringAsync();
         }
     }
 
     record class SimplifiedTrelloRecord(string Name, string Id);
+    record class SimplifiedTrelloCard(string Name, string Id, string Start, string Due);
+    record class ListPosition(string ListId, string Pos = "top");
 }

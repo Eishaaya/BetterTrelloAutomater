@@ -10,13 +10,19 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Timer;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net.Http;
+using System.Globalization;
 
 namespace BetterTrelloAutomator
 {
     class TrelloFunctionality
     {
+        string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
+        TimeZoneInfo myTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+
         SimplifiedTrelloRecord[] lists;
-        int cycleStart;
+        int firstTodo;
+        int todayIndex;
+        int cycleStart => firstTodo + 1;
         int cycleEnd;
 
         async Task GetLists()
@@ -29,7 +35,7 @@ namespace BetterTrelloAutomator
             {
                 if (lists[i].Name.Contains("TODO"))
                 {
-                    cycleStart = i;
+                    firstTodo = i;
                     break;
                 }
             }
@@ -39,6 +45,15 @@ namespace BetterTrelloAutomator
                 if (lists[i].Name.Contains("TODO"))
                 {
                     cycleEnd = i;
+                    break;
+                }
+            }
+            
+            for (int i = cycleEnd; i >= cycleStart; i--)
+            {
+                if (lists[i].Name.Contains("today", StringComparison.OrdinalIgnoreCase))
+                {
+                    todayIndex = i;
                     break;
                 }
             }
@@ -54,12 +69,39 @@ namespace BetterTrelloAutomator
 
         async Task TransitionDays()
         {
+            //Shifting cards over
+
             await GetLists();
             log.LogInformation($"CYCLE: {cycleStart} - {cycleEnd}");
             for (int i = cycleEnd - 1; i >= cycleStart; i--)
             {
                 log.LogInformation($"Moving from {lists[i].Name} to {lists[i + 1].Name}");
-                await client.MoveCards(lists[i].Id, lists[i + 1].Id);
+                await client.MoveCards(lists[i], lists[i + 1]);
+            }
+
+            //Finding cards due within the next week and moving them to corresponding lists
+
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, myTimeZoneInfo);
+            now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day
+
+            var cards = await client.GetCards(lists[firstTodo]);
+            foreach (var card in cards)
+            {
+                string date = card.Start ?? card.Due;
+                
+                if (date == null) continue;
+
+                var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
+                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, myTimeZoneInfo);                
+
+                int daysFromNow = (dateTime - now).Days;
+
+                if (daysFromNow <= cycleEnd - cycleStart && daysFromNow >= 0)
+                {
+                    var movingList = lists[todayIndex - daysFromNow];
+                    log.LogInformation($"Moving card {card.Name} to list {movingList.Name} since it is due in {daysFromNow} days");
+                    await client.MoveCard(card, new ListPosition(movingList.Id));
+                }
             }
         }
 
@@ -84,7 +126,7 @@ namespace BetterTrelloAutomator
             for (int i = cycleStart; i < cycleEnd; i++)
             {
                 log.LogInformation($"Moving from {lists[i + 1].Name} to {lists[i].Name}");
-                await client.MoveCards(lists[i + 1].Id, lists[i].Id);
+                await client.MoveCards(lists[i + 1], lists[i]);
             }
         }
 
