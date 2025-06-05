@@ -11,6 +11,7 @@ using Microsoft.Azure.Functions.Worker.Extensions.Timer;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net.Http;
 using System.Globalization;
+using Microsoft.Extensions.Configuration;
 
 namespace BetterTrelloAutomator
 {
@@ -24,6 +25,21 @@ namespace BetterTrelloAutomator
         int todayIndex;
         int cycleStart => firstTodo + 1;
         int cycleEnd;
+
+        TrelloClient client;
+        ILogger log;
+        bool timersEnabled;
+        public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> log, IConfiguration config)
+        {
+            this.client = client;
+            this.log = log;
+
+            string timersEnabled = config["EnableTrelloTimers"];
+            if (!bool.TryParse(timersEnabled, out this.timersEnabled))
+            {
+                log.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
+            }
+        }
 
         async Task GetLists()
         {
@@ -48,7 +64,7 @@ namespace BetterTrelloAutomator
                     break;
                 }
             }
-            
+
             for (int i = cycleEnd; i >= cycleStart; i--)
             {
                 if (lists[i].Name.Contains("today", StringComparison.OrdinalIgnoreCase))
@@ -59,13 +75,6 @@ namespace BetterTrelloAutomator
             }
         }
 
-        TrelloClient client;
-        ILogger log;
-        public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> log)
-        {
-            this.client = client;
-            this.log = log;
-        }
 
         async Task TransitionDays()
         {
@@ -88,11 +97,11 @@ namespace BetterTrelloAutomator
             foreach (var card in cards)
             {
                 string date = card.Start ?? card.Due;
-                
+
                 if (date == null) continue;
 
                 var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
-                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, myTimeZoneInfo);                
+                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, myTimeZoneInfo);
 
                 int daysFromNow = (dateTime - now).Days;
 
@@ -108,6 +117,11 @@ namespace BetterTrelloAutomator
         [Function("TransitionDays")]
         public async Task TransitionDays([TimerTrigger("0 30 10 * * *")] TimerInfo info)
         {
+            if (!timersEnabled)
+            {
+                log.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(TransitionDays)}");
+            }
+
             log.LogInformation($"Automatically transitioning Days {info}");
             await TransitionDays();
         }
