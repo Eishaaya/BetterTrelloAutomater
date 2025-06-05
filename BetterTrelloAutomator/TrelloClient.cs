@@ -13,22 +13,21 @@ using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator
 {
-    internal class TrelloClient
+    public class TrelloClient
     {
         readonly string key;
         readonly string token;
         readonly string authString;
         const string boardID = "660328145c642e3b4fc66006"; //ID for personal board
-        HttpClient client;
-        ILogger<TrelloClient> logger;
+        readonly HttpClient client;
+        readonly ILogger<TrelloClient> logger;
 
-        JsonSerializerOptions caseInsensitive = new JsonSerializerOptions() { PropertyNameCaseInsensitive = true };
-        JsonSerializerOptions webOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        readonly JsonSerializerOptions caseInsensitive = new() { PropertyNameCaseInsensitive = true };
 
         public TrelloClient(HttpClient httpClient, IConfiguration config, ILogger<TrelloClient> myLogger)
         {
-            key = config["TRELLO_KEY"] ?? throw new ArgumentNullException("FAILED TO LOAD KEY");
-            token = config["TRELLO_TOKEN"] ?? throw new ArgumentNullException("FAILED TO LOAD TOKEN");
+            key = config["TRELLO_KEY"] ?? throw new InvalidOperationException("FAILED TO LOAD TRELLO_KEY");
+            token = config["TRELLO_TOKEN"] ?? throw new InvalidOperationException("FAILED TO LOAD TRELLO_TOKEN");
 
             authString = $"key={key}&token={token}";
 
@@ -65,7 +64,7 @@ namespace BetterTrelloAutomator
 
             var lists = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(body, caseInsensitive).Where((_, i) => i >= startingIndex && i <= endingIndex);
 
-            return lists.ToArray();
+            return [.. lists];
         }
 
         async Task<string> GetResponse(string uri)
@@ -97,13 +96,13 @@ namespace BetterTrelloAutomator
                 new ("idList", position.ListId),
                 new ("pos", position.Pos)
             ]);
-            
+
             var response = await client.PutAsync(uri, content);
             response.EnsureSuccessStatusCode();
         }
     }
 
-    record class SimplifiedTrelloRecord(string Name, string Id);
-    record class SimplifiedTrelloCard(string Name, string Id, string Start, string Due);
-    record class ListPosition(string ListId, string Pos = "top");
+    public record class SimplifiedTrelloRecord(string Name, string Id);
+    public record class SimplifiedTrelloCard(string Name, string Id, string Start, string Due);
+    public record class ListPosition(string ListId, string Pos = "top");
 }

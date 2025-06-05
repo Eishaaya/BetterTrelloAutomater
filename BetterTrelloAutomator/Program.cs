@@ -27,6 +27,7 @@ namespace BetterTrelloAutomator
             {
                 services.AddHttpClient();
                 services.AddSingleton<TrelloClient>();
+                services.AddSingleton<TrelloFunctionality>();
             })
             .ConfigureLogging(logging =>
             {

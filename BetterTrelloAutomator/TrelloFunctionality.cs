@@ -13,28 +13,31 @@ using System.Net.Http;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 
+#pragma warning disable IDE0060 // Remove unused parameter warnings for API params
+
+
 namespace BetterTrelloAutomator
 {
-    class TrelloFunctionality
+    public class TrelloFunctionality
     {
-        string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
-        TimeZoneInfo myTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+        readonly string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
+        TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
 
         SimplifiedTrelloRecord[] lists;
         int firstTodo;
         int todayIndex;
-        int cycleStart => firstTodo + 1;
+        int CycleStart => firstTodo + 1;
         int cycleEnd;
 
-        TrelloClient client;
-        ILogger log;
-        bool timersEnabled;
+        readonly TrelloClient client;
+        readonly ILogger log;
+        readonly bool timersEnabled;
         public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> log, IConfiguration config)
         {
             this.client = client;
             this.log = log;
 
-            string timersEnabled = config["EnableTrelloTimers"];
+            string timersEnabled = config["ENABLE_TRELLO_TIMERS"];
             if (!bool.TryParse(timersEnabled, out this.timersEnabled))
             {
                 log.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
@@ -65,7 +68,7 @@ namespace BetterTrelloAutomator
                 }
             }
 
-            for (int i = cycleEnd; i >= cycleStart; i--)
+            for (int i = cycleEnd; i >= CycleStart; i--)
             {
                 if (lists[i].Name.Contains("today", StringComparison.OrdinalIgnoreCase))
                 {
@@ -81,8 +84,8 @@ namespace BetterTrelloAutomator
             //Shifting cards over
 
             await GetLists();
-            log.LogInformation($"CYCLE: {cycleStart} - {cycleEnd}");
-            for (int i = cycleEnd - 1; i >= cycleStart; i--)
+            log.LogInformation($"CYCLE: {CycleStart} - {cycleEnd}");
+            for (int i = cycleEnd - 1; i >= CycleStart; i--)
             {
                 log.LogInformation($"Moving from {lists[i].Name} to {lists[i + 1].Name}");
                 await client.MoveCards(lists[i], lists[i + 1]);
@@ -90,7 +93,7 @@ namespace BetterTrelloAutomator
 
             //Finding cards due within the next week and moving them to corresponding lists
 
-            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, myTimeZoneInfo);
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MyTimeZoneInfo);
             now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day
 
             var cards = await client.GetCards(lists[firstTodo]);
@@ -101,11 +104,11 @@ namespace BetterTrelloAutomator
                 if (date == null) continue;
 
                 var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
-                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, myTimeZoneInfo);
+                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, MyTimeZoneInfo);
 
                 int daysFromNow = (dateTime - now).Days;
 
-                if (daysFromNow <= cycleEnd - cycleStart && daysFromNow >= 0)
+                if (daysFromNow <= cycleEnd - CycleStart && daysFromNow >= 0)
                 {
                     var movingList = lists[todayIndex - daysFromNow];
                     log.LogInformation($"Moving card {card.Name} to list {movingList.Name} since it is due in {daysFromNow} days");
@@ -137,7 +140,7 @@ namespace BetterTrelloAutomator
         {
             await GetLists();
             log.LogInformation($"De-transitioning Days MANUALLY");
-            for (int i = cycleStart; i < cycleEnd; i++)
+            for (int i = CycleStart; i < cycleEnd; i++)
             {
                 log.LogInformation($"Moving from {lists[i + 1].Name} to {lists[i].Name}");
                 await client.MoveCards(lists[i + 1], lists[i]);
