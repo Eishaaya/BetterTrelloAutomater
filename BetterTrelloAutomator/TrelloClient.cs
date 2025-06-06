@@ -1,15 +1,7 @@
-﻿using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Extensions;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator
 {
@@ -46,7 +38,7 @@ namespace BetterTrelloAutomator
             var boards = await GetResponse(url);
 
             var usableBoards = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(boards, caseInsensitive);
-            foreach (var board in usableBoards)
+            foreach (var board in usableBoards!)
             {
                 if (board.Name == "Personal")
                 {
@@ -62,7 +54,7 @@ namespace BetterTrelloAutomator
             var url = $"boards/{boardID}/lists?fields=name,id&";
             var body = await GetResponse(url);
 
-            var lists = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(body, caseInsensitive).Where((_, i) => i >= startingIndex && i <= endingIndex);
+            var lists = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(body, caseInsensitive)!.Where((_, i) => i >= startingIndex && i <= endingIndex);
 
             return [.. lists];
         }
@@ -71,7 +63,7 @@ namespace BetterTrelloAutomator
         {
             var response = await client.GetAsync(uri + authString);
             response.EnsureSuccessStatusCode();
-            return await response?.Content.ReadAsStringAsync();
+            return await response.Content.ReadAsStringAsync();
         }
 
         #endregion
@@ -86,7 +78,7 @@ namespace BetterTrelloAutomator
         public async Task<SimplifiedTrelloCard[]> GetCards(SimplifiedTrelloRecord list)
         {
             var response = await GetResponse($"lists/{list.Id}/cards?fields=name,id,start,due&");
-            return JsonSerializer.Deserialize<SimplifiedTrelloCard[]>(response, caseInsensitive);
+            return JsonSerializer.Deserialize<SimplifiedTrelloCard[]>(response, caseInsensitive)!;
         }
 
         public async Task MoveCard(SimplifiedTrelloCard card, ListPosition position)

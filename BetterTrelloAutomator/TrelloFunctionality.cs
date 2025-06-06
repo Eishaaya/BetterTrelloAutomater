@@ -1,15 +1,7 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Extensions.Timer;
 using Microsoft.Azure.Functions.Worker.Http;
-using System.Net.Http;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 
@@ -20,6 +12,8 @@ namespace BetterTrelloAutomator
 {
     public class TrelloFunctionality
     {
+        private readonly ILogger<TrelloFunctionality> logger;
+
         readonly string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
         TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
 
@@ -30,17 +24,16 @@ namespace BetterTrelloAutomator
         int cycleEnd;
 
         readonly TrelloClient client;
-        readonly ILogger log;
         readonly bool timersEnabled;
-        public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> log, IConfiguration config)
+        public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> logger, IConfiguration config)
         {
             this.client = client;
-            this.log = log;
+            this.logger = logger;
 
-            string timersEnabled = config["ENABLE_TRELLO_TIMERS"];
+            string? timersEnabled = config["ENABLE_TRELLO_TIMERS"];
             if (!bool.TryParse(timersEnabled, out this.timersEnabled))
             {
-                log.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
+                logger.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
             }
         }
 
@@ -84,10 +77,10 @@ namespace BetterTrelloAutomator
             //Shifting cards over
 
             await GetLists();
-            log.LogInformation($"CYCLE: {CycleStart} - {cycleEnd}");
+            logger.LogInformation($"CYCLE: {CycleStart} - {cycleEnd}");
             for (int i = cycleEnd - 1; i >= CycleStart; i--)
             {
-                log.LogInformation($"Moving from {lists[i].Name} to {lists[i + 1].Name}");
+                logger.LogInformation($"Moving from {lists[i].Name} to {lists[i + 1].Name}");
                 await client.MoveCards(lists[i], lists[i + 1]);
             }
 
@@ -111,7 +104,7 @@ namespace BetterTrelloAutomator
                 if (daysFromNow <= cycleEnd - CycleStart && daysFromNow >= 0)
                 {
                     var movingList = lists[todayIndex - daysFromNow];
-                    log.LogInformation($"Moving card {card.Name} to list {movingList.Name} since it is due in {daysFromNow} days");
+                    logger.LogInformation($"Moving card {card.Name} to list {movingList.Name} since it is due in {daysFromNow} days");
                     await client.MoveCard(card, new ListPosition(movingList.Id));
                 }
             }
@@ -122,27 +115,27 @@ namespace BetterTrelloAutomator
         {
             if (!timersEnabled)
             {
-                log.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(TransitionDays)}");
+                logger.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(TransitionDays)}");
             }
 
-            log.LogInformation($"Automatically transitioning Days {info}");
+            logger.LogInformation($"Automatically transitioning Days {info}");
             await TransitionDays();
         }
 
         [Function("ManuallyTransitionDays")]
         public async Task ManuallyTransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
-            log.LogInformation($"Transitioning Days MANUALLY");
+            logger.LogInformation($"Transitioning Days MANUALLY");
             await TransitionDays();
         }
         [Function("DetransitionDays")]
         public async Task DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
             await GetLists();
-            log.LogInformation($"De-transitioning Days MANUALLY");
+            logger.LogInformation($"De-transitioning Days MANUALLY");
             for (int i = CycleStart; i < cycleEnd; i++)
             {
-                log.LogInformation($"Moving from {lists[i + 1].Name} to {lists[i].Name}");
+                logger.LogInformation($"Moving from {lists[i + 1].Name} to {lists[i].Name}");
                 await client.MoveCards(lists[i + 1], lists[i]);
             }
         }
@@ -150,14 +143,14 @@ namespace BetterTrelloAutomator
         [Function("GetPersonalID")]
         public async Task<IActionResult> GetPersonalID([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
-            log.LogInformation("Getting ID");
+            logger.LogInformation("Getting ID");
             return new OkObjectResult(await client.GetPersonalBoardID());
         }
 
         [Function("GetLists")]
         public async Task<IActionResult> GetLists([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
-            log.LogInformation("User requesting to get lists");
+            logger.LogInformation("User requesting to get lists");
             return new OkObjectResult(await client.GetLists());
         }
 

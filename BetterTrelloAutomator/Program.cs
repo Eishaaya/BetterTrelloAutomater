@@ -1,43 +1,36 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator
 {
     internal class Program
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
-            var host = new HostBuilder()
-                .ConfigureFunctionsWorkerDefaults()
-                        .ConfigureAppConfiguration(m =>
-            {
-                m.AddJsonFile("local.settings.json");
-                m.AddEnvironmentVariables();
-            })
-            //  .ConfigureFunctionsWorkerDefaults()
-            .ConfigureServices(services =>
-            {
-                services.AddHttpClient();
-                services.AddSingleton<TrelloClient>();
-                services.AddSingleton<TrelloFunctionality>();
-            })
-            .ConfigureLogging(logging =>
-            {
-                logging.ClearProviders();
-                logging.AddConsole();
-                logging.SetMinimumLevel(LogLevel.Information);
-            })
-            .Build();
+            var builder = FunctionsApplication.CreateBuilder(args);
 
-            host.Run();
+            builder.ConfigureFunctionsWebApplication();
+
+            builder.Configuration
+                .AddEnvironmentVariables();
+
+            builder.Services
+                .AddApplicationInsightsTelemetryWorkerService()
+                .ConfigureFunctionsApplicationInsights()
+                .AddHttpClient()
+                .AddSingleton<TrelloClient>()
+                .AddSingleton<TrelloFunctionality>();
+
+            builder.Logging
+                .AddConsole()
+                .SetMinimumLevel(LogLevel.Information);
+
+            builder.Build().Run();
+
         }
     }
 }
