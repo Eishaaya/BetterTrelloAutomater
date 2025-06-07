@@ -17,7 +17,7 @@ namespace BetterTrelloAutomator
         readonly string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
         TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
 
-        SimplifiedTrelloRecord[] lists;
+        SimplifiedTrelloRecord[] lists = null!;
         int firstTodo;
         int todayIndex;
         int CycleStart => firstTodo + 1;
@@ -77,10 +77,10 @@ namespace BetterTrelloAutomator
             //Shifting cards over
 
             await GetLists();
-            logger.LogInformation($"CYCLE: {CycleStart} - {cycleEnd}");
+            logger.LogInformation("CYCLE: {CycleStart} - {cycleEnd}", CycleStart, cycleEnd);
             for (int i = cycleEnd - 1; i >= CycleStart; i--)
             {
-                logger.LogInformation($"Moving from {lists[i].Name} to {lists[i + 1].Name}");
+                logger.LogInformation("Moving from {firstCard} to {secondCard}", lists[i].Name, lists[i + 1].Name);
                 await client.MoveCards(lists[i], lists[i + 1]);
             }
 
@@ -104,7 +104,7 @@ namespace BetterTrelloAutomator
                 if (daysFromNow <= cycleEnd - CycleStart && daysFromNow >= 0)
                 {
                     var movingList = lists[todayIndex - daysFromNow];
-                    logger.LogInformation($"Moving card {card.Name} to list {movingList.Name} since it is due in {daysFromNow} days");
+                    logger.LogInformation("Moving card {cardName} to list {newList} since it is due in {daysFromNow} days", card.Name, movingList.Name, daysFromNow);
                     await client.MoveCard(card, new ListPosition(movingList.Id));
                 }
             }
@@ -118,7 +118,7 @@ namespace BetterTrelloAutomator
                 logger.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(TransitionDays)}");
             }
 
-            logger.LogInformation($"Automatically transitioning Days {info}");
+            logger.LogInformation("Automatically transitioning Days {timerInfo}", info);
             await TransitionDays();
         }
 
@@ -135,7 +135,7 @@ namespace BetterTrelloAutomator
             logger.LogInformation($"De-transitioning Days MANUALLY");
             for (int i = CycleStart; i < cycleEnd; i++)
             {
-                logger.LogInformation($"Moving from {lists[i + 1].Name} to {lists[i].Name}");
+                logger.LogInformation("Moving from {secondList} to {firstList}", lists[i + 1], lists[i]);
                 await client.MoveCards(lists[i + 1], lists[i]);
             }
         }
