@@ -113,10 +113,28 @@ namespace BetterTrelloAutomator
             }
         }
         [Function("ManuallySeparateNightTasks")]
+
         public Task ManuallySeparateNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => SeparateNightTasks();
+        
+        Task MergeNightTasks() => client.MoveCards(Lists[boardInfo.TonightIndex], Lists[boardInfo.TodayIndex]);
+
+        [Function("MergeNightTasks")]
+        public async Task MergeNightTasks([TimerTrigger("0 5 2 * * *")] TimerInfo info)
+        {
+            if (!timersEnabled)
+            {
+                logger.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(MergeNightTasks)}");
+                return;
+            }
+
+            await MergeNightTasks();
+        }
+        [Function("ManuallyMergeNightTasks")]
+        public Task ManuallyMergeNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => MergeNightTasks();
+
 
         [Function("TransitionDays")]
-        public async Task TransitionDays([TimerTrigger("0 30 10 * * *")] TimerInfo info)
+        public async Task TransitionDays([TimerTrigger($"0 30 10 * * *")] TimerInfo info)
         {
             if (!timersEnabled)
             {
