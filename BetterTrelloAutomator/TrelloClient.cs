@@ -21,7 +21,7 @@ namespace BetterTrelloAutomator
             key = config["TRELLO_KEY"] ?? throw new InvalidOperationException("FAILED TO LOAD TRELLO_KEY");
             token = config["TRELLO_TOKEN"] ?? throw new InvalidOperationException("FAILED TO LOAD TRELLO_TOKEN");
 
-            authString = $"key={key}&token={token}";
+            authString = $"&key={key}&token={token}";
 
             client = httpClient;
             client.BaseAddress = new Uri("https://api.trello.com/1/");
@@ -34,10 +34,9 @@ namespace BetterTrelloAutomator
         #region utility
         public async Task<string> GetPersonalBoardID()
         {
-            var url = "members/me/boards?fields=name,id&";
-            var boards = await GetResponse(url);
+            var uri = $"members/me/boards";
+            var usableBoards = await GetValues<SimplifiedTrelloRecord>(uri); 
 
-            var usableBoards = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(boards, caseInsensitive);
             foreach (var board in usableBoards!)
             {
                 if (board.Name == "Personal")
@@ -51,12 +50,9 @@ namespace BetterTrelloAutomator
 
         public async Task<SimplifiedTrelloRecord[]> GetLists(int startingIndex = 0, int endingIndex = int.MaxValue)
         {
-            var url = $"boards/{boardID}/lists?fields=name,id&";
-            var body = await GetResponse(url);
+            var lists = await GetValues<SimplifiedTrelloRecord>($"boards/{boardID}/lists");
 
-            var lists = JsonSerializer.Deserialize<SimplifiedTrelloRecord[]>(body, caseInsensitive)!.Where((_, i) => i >= startingIndex && i <= endingIndex);
-
-            return [.. lists];
+            return [.. lists.Where((_, i) => i >= startingIndex && i <= endingIndex)];
         }
 
         async Task<string> GetResponse(string uri)
@@ -66,22 +62,32 @@ namespace BetterTrelloAutomator
             return await response.Content.ReadAsStringAsync();
         }
 
+        async Task<TRecord> GetValue<TRecord>(string uri)
+        {
+            var response = await GetResponse($"{uri}?fields={RecordHelpers.GetFields<TRecord>()}");
+            return JsonSerializer.Deserialize<TRecord>(response, caseInsensitive)!;
+        }
+        async Task<TRecord[]> GetValues<TRecord>(string uri)
+        {
+            var response = await GetResponse($"{uri}?fields={RecordHelpers.GetFields<TRecord>()}");
+            return JsonSerializer.Deserialize<TRecord[]>(response, caseInsensitive)!;
+        }
+
         #endregion
 
         public async Task MoveCards(SimplifiedTrelloRecord from, SimplifiedTrelloRecord to)
         {
-            var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}&" + authString;
+            var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}" + authString;
             var response = await client.PostAsync(uri, null);
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task<SimplifiedTrelloCard[]> GetCards(SimplifiedTrelloRecord list)
+        public async Task<TrelloCard[]> GetCards(SimplifiedTrelloRecord list)
         {
-            var response = await GetResponse($"lists/{list.Id}/cards?fields=name,id,start,due&");
-            return JsonSerializer.Deserialize<SimplifiedTrelloCard[]>(response, caseInsensitive)!;
+            return await GetValues<TrelloCard>($"lists/{list.Id}/cards");           
         }
 
-        public async Task MoveCard(SimplifiedTrelloCard card, ListPosition position)
+        public async Task MoveCard(TrelloCard card, TrelloListPosition position)
         {
             var uri = $"cards/{card.Id}?" + authString;
             var content = new FormUrlEncodedContent([
@@ -94,7 +100,4 @@ namespace BetterTrelloAutomator
         }
     }
 
-    public record class SimplifiedTrelloRecord(string Name, string Id);
-    public record class SimplifiedTrelloCard(string Name, string Id, string Start, string Due);
-    public record class ListPosition(string ListId, string Pos = "top");
 }

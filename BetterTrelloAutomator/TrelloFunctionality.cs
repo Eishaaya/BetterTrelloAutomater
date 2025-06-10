@@ -4,6 +4,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 
 #pragma warning disable IDE0060 // Remove unused parameter warnings for API params
 
@@ -11,85 +13,56 @@ using Microsoft.Extensions.Configuration;
 namespace BetterTrelloAutomator
 {
     public class TrelloFunctionality
-    {
+    {      
+        static int Instances = 0;
+
         private readonly ILogger<TrelloFunctionality> logger;
 
-        readonly string timeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
-        TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-
-        SimplifiedTrelloRecord[] lists = null!;
-        int firstTodo;
-        int todayIndex;
-        int CycleStart => firstTodo + 1;
-        int cycleEnd;
-
         readonly TrelloClient client;
+        readonly TrelloBoardInfo boardInfo;
+
+        SimplifiedTrelloRecord[] Lists => boardInfo.Lists;
+
         readonly bool timersEnabled;
-        public TrelloFunctionality(TrelloClient client, ILogger<TrelloFunctionality> logger, IConfiguration config)
+        public TrelloFunctionality(TrelloClient client, TrelloBoardInfo boardInfo, ILogger<TrelloFunctionality> logger, IConfiguration config)
         {
             this.client = client;
+            this.boardInfo = boardInfo;
             this.logger = logger;
+
+            logger.LogInformation("INIT TO FUNCTIONALITY # {InstanceCount}", Instances++);
 
             string? timersEnabled = config["ENABLE_TRELLO_TIMERS"];
             if (!bool.TryParse(timersEnabled, out this.timersEnabled))
             {
                 logger.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
             }
-        }
-
-        async Task GetLists()
-        {
-            if (lists != null) return;
-
-            lists = await client.GetLists();
-
-            for (int i = 0; i < lists.Length; i++)
-            {
-                if (lists[i].Name.Contains("TODO"))
-                {
-                    firstTodo = i;
-                    break;
-                }
-            }
-
-            for (int i = lists.Length - 1; i >= 0; i--)
-            {
-                if (lists[i].Name.Contains("TODO"))
-                {
-                    cycleEnd = i;
-                    break;
-                }
-            }
-
-            for (int i = cycleEnd; i >= CycleStart; i--)
-            {
-                if (lists[i].Name.Contains("today", StringComparison.OrdinalIgnoreCase))
-                {
-                    todayIndex = i;
-                    break;
-                }
-            }
-        }
-
+        }      
 
         async Task TransitionDays()
         {
             //Shifting cards over
 
-            await GetLists();
-            logger.LogInformation("CYCLE: {CycleStart} - {cycleEnd}", CycleStart, cycleEnd);
-            for (int i = cycleEnd - 1; i >= CycleStart; i--)
+            logger.LogInformation("CYCLE: {CycleStart} - {cycleEnd}", boardInfo.CycleStart, boardInfo.CycleEnd);
+            for (int i = boardInfo.CycleEnd - 1; i >= boardInfo.CycleStart; i--)
             {
-                logger.LogInformation("Moving from {firstCard} to {secondCard}", lists[i].Name, lists[i + 1].Name);
-                await client.MoveCards(lists[i], lists[i + 1]);
+                logger.LogInformation("Moving from {firstCard} to {secondCard}", Lists[i].Name, Lists[i + 1].Name);
+                await client.MoveCards(Lists[i], Lists[i + 1]);
             }
 
+            await MoveFromFuture();
+        }
+
+        async Task MoveFromFuture()
+        {
             //Finding cards due within the next week and moving them to corresponding lists
 
-            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MyTimeZoneInfo);
+            logger.LogInformation("Moving cards out of future list");
+
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, boardInfo.MyTimeZoneInfo);
             now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day
 
-            var cards = await client.GetCards(lists[firstTodo]);
+            var cards = await client.GetCards(Lists[boardInfo.FirstTodo]);
             foreach (var card in cards)
             {
                 string date = card.Start ?? card.Due;
@@ -97,16 +70,28 @@ namespace BetterTrelloAutomator
                 if (date == null) continue;
 
                 var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
-                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, MyTimeZoneInfo);
+                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, boardInfo.MyTimeZoneInfo);
 
-                int daysFromNow = (dateTime - now).Days;
+                int daysFromNow = (int)(dateTime - now).TotalDays;
 
-                if (daysFromNow <= cycleEnd - CycleStart && daysFromNow >= 0)
+                if (daysFromNow <= boardInfo.CycleEnd - boardInfo.CycleStart && daysFromNow >= 0)
                 {
-                    var movingList = lists[todayIndex - daysFromNow];
+                    var movingList = Lists[boardInfo.TodayIndex - daysFromNow];
                     logger.LogInformation("Moving card {cardName} to list {newList} since it is due in {daysFromNow} days", card.Name, movingList.Name, daysFromNow);
-                    await client.MoveCard(card, new ListPosition(movingList.Id));
+                    await client.MoveCard(card, new TrelloListPosition(movingList.Id));
                 }
+            }
+        }
+        [Function("ManuallyMoveFromFuture")]
+        public async Task ManuallyMoveFromFuture([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => await MoveFromFuture();
+
+        async Task SeparateNightTasks()
+        {
+            var cards = await client.GetCards(Lists[boardInfo.TodayIndex]);
+
+            foreach (var card in cards)
+            {
+
             }
         }
 
@@ -116,6 +101,7 @@ namespace BetterTrelloAutomator
             if (!timersEnabled)
             {
                 logger.LogCritical($"TIMERS ARE DISABLED, SKIPPING {nameof(TransitionDays)}");
+                return;
             }
 
             logger.LogInformation("Automatically transitioning Days {timerInfo}", info);
@@ -131,12 +117,11 @@ namespace BetterTrelloAutomator
         [Function("DetransitionDays")]
         public async Task DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
-            await GetLists();
             logger.LogInformation($"De-transitioning Days MANUALLY");
-            for (int i = CycleStart; i < cycleEnd; i++)
+            for (int i = boardInfo.CycleStart; i < boardInfo.CycleEnd; i++)
             {
-                logger.LogInformation("Moving from {secondList} to {firstList}", lists[i + 1], lists[i]);
-                await client.MoveCards(lists[i + 1], lists[i]);
+                logger.LogInformation("Moving from {secondList} to {firstList}", Lists[i + 1], Lists[i]);
+                await client.MoveCards(Lists[i + 1], Lists[i]);
             }
         }
 

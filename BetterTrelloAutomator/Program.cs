@@ -18,12 +18,15 @@ namespace BetterTrelloAutomator
             builder.Configuration
                 .AddEnvironmentVariables();
 
+
+
             builder.Services
                 .AddApplicationInsightsTelemetryWorkerService()
                 .ConfigureFunctionsApplicationInsights()
                 .AddHttpClient()
-                .AddSingleton<TrelloClient>()
-                .AddSingleton<TrelloFunctionality>();
+                .AddTransient<TrelloClient>()
+                .AddSingleton<TrelloBoardInfo>()
+                .AddHostedService<TrelloBoardInfo.StartupService>();
 
             builder.Logging
                 .AddConsole()
