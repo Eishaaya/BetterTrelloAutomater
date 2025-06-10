@@ -21,7 +21,7 @@ namespace BetterTrelloAutomator
         readonly TrelloClient client;
         readonly TrelloBoardInfo boardInfo;
 
-        SimplifiedTrelloRecord[] Lists => boardInfo.Lists;
+        SimpleTrelloRecord[] Lists => boardInfo.Lists;
 
         readonly bool timersEnabled;
         public TrelloFunctionality(TrelloClient client, TrelloBoardInfo boardInfo, ILogger<TrelloFunctionality> logger, IConfiguration config)
@@ -51,6 +51,21 @@ namespace BetterTrelloAutomator
             }
 
             await MoveFromFuture();
+            await SeparateNightTasks();
+        }
+
+        [Function("ManuallyTransitionDays")]
+        public Task ManuallyTransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req) => TransitionDays();
+
+        [Function("DetransitionDays")]
+        public async Task DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
+        {
+            logger.LogInformation($"De-transitioning Days MANUALLY");
+            for (int i = boardInfo.CycleStart; i < boardInfo.CycleEnd; i++)
+            {
+                logger.LogInformation("Moving from {secondList} to {firstList}", Lists[i + 1], Lists[i]);
+                await client.MoveCards(Lists[i + 1], Lists[i]);
+            }
         }
 
         async Task MoveFromFuture()
@@ -83,7 +98,7 @@ namespace BetterTrelloAutomator
             }
         }
         [Function("ManuallyMoveFromFuture")]
-        public async Task ManuallyMoveFromFuture([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => await MoveFromFuture();
+        public Task ManuallyMoveFromFuture([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => MoveFromFuture();
 
         async Task SeparateNightTasks()
         {
@@ -91,9 +106,14 @@ namespace BetterTrelloAutomator
 
             foreach (var card in cards)
             {
-
+                if (!card.Labels.Contains(TrelloLabel.Morning, TrelloNameComparer.Instance) && card.Labels.Contains(TrelloLabel.Night, TrelloNameComparer.Instance))
+                {
+                    await client.MoveCard(card, Lists[boardInfo.TonightIndex]);
+                }
             }
         }
+        [Function("ManuallySeparateNightTasks")]
+        public Task ManuallySeparateNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => SeparateNightTasks();
 
         [Function("TransitionDays")]
         public async Task TransitionDays([TimerTrigger("0 30 10 * * *")] TimerInfo info)
@@ -106,23 +126,6 @@ namespace BetterTrelloAutomator
 
             logger.LogInformation("Automatically transitioning Days {timerInfo}", info);
             await TransitionDays();
-        }
-
-        [Function("ManuallyTransitionDays")]
-        public async Task ManuallyTransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
-        {
-            logger.LogInformation($"Transitioning Days MANUALLY");
-            await TransitionDays();
-        }
-        [Function("DetransitionDays")]
-        public async Task DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
-        {
-            logger.LogInformation($"De-transitioning Days MANUALLY");
-            for (int i = boardInfo.CycleStart; i < boardInfo.CycleEnd; i++)
-            {
-                logger.LogInformation("Moving from {secondList} to {firstList}", Lists[i + 1], Lists[i]);
-                await client.MoveCards(Lists[i + 1], Lists[i]);
-            }
         }
 
         [Function("GetPersonalID")]
@@ -138,8 +141,5 @@ namespace BetterTrelloAutomator
             logger.LogInformation("User requesting to get lists");
             return new OkObjectResult(await client.GetLists());
         }
-
-
-
     }
 }

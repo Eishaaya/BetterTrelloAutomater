@@ -25,9 +25,10 @@ namespace BetterTrelloAutomator
 
         internal readonly string TimeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
         internal TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
-        internal SimplifiedTrelloRecord[] Lists = null!;
+        internal SimpleTrelloRecord[] Lists = null!;
         internal int FirstTodo;
         internal int TodayIndex;
+        internal int TonightIndex => TodayIndex + 1;
         internal int CycleStart => FirstTodo + 1;
         internal int CycleEnd;
 

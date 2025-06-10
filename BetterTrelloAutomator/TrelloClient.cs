@@ -35,7 +35,7 @@ namespace BetterTrelloAutomator
         public async Task<string> GetPersonalBoardID()
         {
             var uri = $"members/me/boards";
-            var usableBoards = await GetValues<SimplifiedTrelloRecord>(uri); 
+            var usableBoards = await GetValues<SimpleTrelloRecord>(uri); 
 
             foreach (var board in usableBoards!)
             {
@@ -48,9 +48,9 @@ namespace BetterTrelloAutomator
             throw new InvalidOperationException("Failed to find personal board!");
         }
 
-        public async Task<SimplifiedTrelloRecord[]> GetLists(int startingIndex = 0, int endingIndex = int.MaxValue)
+        public async Task<SimpleTrelloRecord[]> GetLists(int startingIndex = 0, int endingIndex = int.MaxValue)
         {
-            var lists = await GetValues<SimplifiedTrelloRecord>($"boards/{boardID}/lists");
+            var lists = await GetValues<SimpleTrelloRecord>($"boards/{boardID}/lists");
 
             return [.. lists.Where((_, i) => i >= startingIndex && i <= endingIndex)];
         }
@@ -70,19 +70,20 @@ namespace BetterTrelloAutomator
         async Task<TRecord[]> GetValues<TRecord>(string uri)
         {
             var response = await GetResponse($"{uri}?fields={RecordHelpers.GetFields<TRecord>()}");
+            
             return JsonSerializer.Deserialize<TRecord[]>(response, caseInsensitive)!;
         }
 
         #endregion
 
-        public async Task MoveCards(SimplifiedTrelloRecord from, SimplifiedTrelloRecord to)
+        public async Task MoveCards(SimpleTrelloRecord from, SimpleTrelloRecord to)
         {
             var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}" + authString;
             var response = await client.PostAsync(uri, null);
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task<TrelloCard[]> GetCards(SimplifiedTrelloRecord list)
+        public async Task<TrelloCard[]> GetCards(SimpleTrelloRecord list)
         {
             return await GetValues<TrelloCard>($"lists/{list.Id}/cards");           
         }
