@@ -34,6 +34,7 @@ namespace BetterTrelloAutomator
 
             builder.Build().Run();
 
+            //Generating commit to be able to deploy to new subscription
         }
     }
 }
