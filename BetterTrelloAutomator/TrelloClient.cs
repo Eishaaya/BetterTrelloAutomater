@@ -83,12 +83,9 @@ namespace BetterTrelloAutomator
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task<TrelloCard[]> GetCards(SimpleTrelloRecord list)
-        {
-            return await GetValues<TrelloCard>($"lists/{list.Id}/cards");           
-        }
+        public Task<TCard[]> GetCards<TCard>(SimpleTrelloRecord list) => GetValues<TCard>($"lists/{list.Id}/cards");
 
-        public async Task MoveCard(TrelloCard card, TrelloListPosition position)
+        public async Task MoveCard<TCard>(TCard card, TrelloListPosition position) where TCard : SimpleTrelloCard
         {
             var uri = $"cards/{card.Id}?" + authString;
             var content = new FormUrlEncodedContent([

@@ -77,7 +77,7 @@ namespace BetterTrelloAutomator
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, boardInfo.MyTimeZoneInfo);
             now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day
 
-            var cards = await client.GetCards(Lists[boardInfo.FirstTodo]);
+            var cards = await client.GetCards<SimpleTrelloCard>(Lists[boardInfo.FirstTodo]);
             foreach (var card in cards)
             {
                 string date = card.Start ?? card.Due;
@@ -102,7 +102,7 @@ namespace BetterTrelloAutomator
 
         async Task SeparateNightTasks()
         {
-            var cards = await client.GetCards(Lists[boardInfo.TodayIndex]);
+            var cards = await client.GetCards<LabeledTrelloCard>(Lists[boardInfo.TodayIndex]);
 
             foreach (var card in cards)
             {

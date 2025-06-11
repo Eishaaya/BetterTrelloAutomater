@@ -13,7 +13,8 @@ namespace BetterTrelloAutomator
         public string Id { get; }
     }
     public record class SimpleTrelloRecord(string Name, string Id) : IHasId;
-    public record class TrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels) : SimpleTrelloRecord(Name, Id);
+    public record class SimpleTrelloCard(string Name, string Id, string Start, string Due) : SimpleTrelloRecord(Name, Id);
+    public record class LabeledTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
     public record class TrelloLabel(string Name, string Id, string Color) : SimpleTrelloRecord(Name, Id)
     {
         public static TrelloLabel Night => new TrelloLabel("Night", null!, null!);
