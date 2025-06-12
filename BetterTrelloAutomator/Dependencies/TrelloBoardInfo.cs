@@ -7,15 +7,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BetterTrelloAutomator
+namespace BetterTrelloAutomator.Dependencies
 {
     public class TrelloBoardInfo
     {
-        public class StartupService : IHostedService
+        public class StartupService(TrelloBoardInfo boardInfo) : IHostedService
         {
-            TrelloBoardInfo boardInfo;
-            public StartupService(TrelloBoardInfo boardInfo) => this.boardInfo = boardInfo;
-            
+            readonly TrelloBoardInfo boardInfo = boardInfo;
+
             public Task StartAsync(CancellationToken cancellationToken) => boardInfo.Setup();
             public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         }
@@ -71,8 +70,5 @@ namespace BetterTrelloAutomator
                 }
             }
         }
-
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
     }
 }

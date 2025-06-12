@@ -11,12 +11,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 
-#pragma warning disable IDE0060 // Remove unused parameter warnings for API params
-
-
-namespace BetterTrelloAutomator
+namespace BetterTrelloAutomator.AzureFunctions
 {
-    public class TrelloFunctionality
+    public partial class TrelloFunctionality
     {
         static int Instances = 0;
 
@@ -153,6 +150,7 @@ namespace BetterTrelloAutomator
                 return;
             }
 
+            logger.LogInformation("Automatically merging night tasks {timerInfo}", info);
             await MergeNightTasks();
         }
         [Function("ManuallyMergeNightTasks")]
@@ -176,32 +174,6 @@ namespace BetterTrelloAutomator
 
             logger.LogInformation("Automatically transitioning Days {timerInfo}", info);
             await TransitionDays();
-        }
-
-        [Function("GetPersonalID")]
-        [OpenApiOperation("GetPersonalID", ["Misc"])]
-        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(string), Description = "the ID of the user who supplied the trello key and token in ENV (that's probably me)")]
-        public async Task<HttpResponseData> GetPersonalID([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
-        {
-            logger.LogInformation("Getting ID");
-            var id = await client.GetPersonalBoardID();
-
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.WriteString(id);
-            return response;
-        }
-
-        [Function("GetLists")]
-        [OpenApiOperation("GetLists", ["Misc"])]
-        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(SimpleTrelloRecord[]), Description = "All the lists of the client's board")]
-        public async Task<HttpResponseData> GetLists([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
-        {
-            logger.LogInformation("User requesting to get lists");
-            var lists = await client.GetLists();
-
-            var response =  req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteAsJsonAsync(lists);
-            return response;
         }
     }
 }

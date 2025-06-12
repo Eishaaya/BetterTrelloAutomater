@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace BetterTrelloAutomator
+namespace BetterTrelloAutomator.Helpers
 {
     class IdComparer : IEqualityComparer<IHasId>, IComparer<IHasId>
     {

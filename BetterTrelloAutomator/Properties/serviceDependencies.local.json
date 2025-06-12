@@ -6,6 +6,12 @@
     "storage1": {
       "type": "storage.emulator",
       "connectionId": "AzureWebJobsStorage"
+    },
+    "appInsights2": {
+      "ignored": "true",
+      "type": "appInsights",
+      "connectionId": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+      "dynamicId": null
     }
   }
 }
