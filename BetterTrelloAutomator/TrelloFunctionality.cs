@@ -1,11 +1,15 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using System.Globalization;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
 using System.Diagnostics;
+using System.Globalization;
+using System.Net;
 
 #pragma warning disable IDE0060 // Remove unused parameter warnings for API params
 
@@ -13,7 +17,7 @@ using System.Diagnostics;
 namespace BetterTrelloAutomator
 {
     public class TrelloFunctionality
-    {      
+    {
         static int Instances = 0;
 
         private readonly ILogger<TrelloFunctionality> logger;
@@ -37,7 +41,7 @@ namespace BetterTrelloAutomator
             {
                 logger.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
             }
-        }      
+        }
 
         async Task TransitionDays()
         {
@@ -52,13 +56,21 @@ namespace BetterTrelloAutomator
 
             await MoveFromFuture();
             await SeparateNightTasks();
-        }
+        }  
 
         [Function("ManuallyTransitionDays")]
-        public Task ManuallyTransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req) => TransitionDays();
+        [OpenApiOperation("TransitionDays", tags: ["MovementTesting"])]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully transitioned days forwards and out of future (if necessaru), and separated any night tasks")]
+        public async Task<HttpResponseData> ManuallyTransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
+        {
+            await TransitionDays();
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
 
         [Function("DetransitionDays")]
-        public async Task DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
+        [OpenApiOperation("DetransitionDays", tags: ["MovementTesting"])]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully moved tasks one day backwards")]
+        public async Task<HttpResponseData> DetransitionDays([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
             logger.LogInformation($"De-transitioning Days MANUALLY");
             for (int i = boardInfo.CycleStart; i < boardInfo.CycleEnd; i++)
@@ -66,6 +78,8 @@ namespace BetterTrelloAutomator
                 logger.LogInformation("Moving from {secondList} to {firstList}", Lists[i + 1], Lists[i]);
                 await client.MoveCards(Lists[i + 1], Lists[i]);
             }
+
+            return req.CreateResponse(HttpStatusCode.OK);
         }
 
         async Task MoveFromFuture()
@@ -75,21 +89,21 @@ namespace BetterTrelloAutomator
             logger.LogInformation("Moving cards out of future list");
 
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, boardInfo.MyTimeZoneInfo);
-            now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day
+            now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day in my timezone
 
             var cards = await client.GetCards<SimpleTrelloCard>(Lists[boardInfo.FirstTodo]);
+
             foreach (var card in cards)
             {
                 string date = card.Start ?? card.Due;
-
                 if (date == null) continue;
 
                 var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
-                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, boardInfo.MyTimeZoneInfo);
+                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, boardInfo.MyTimeZoneInfo); //Getting due datetime in my timezone
 
-                int daysFromNow = (int)(dateTime - now).TotalDays;
+                int daysFromNow = (int)(dateTime - now).TotalDays; //How many days from now this card is due
 
-                if (daysFromNow <= boardInfo.CycleEnd - boardInfo.CycleStart && daysFromNow >= 0)
+                if (daysFromNow <= boardInfo.CycleEnd - boardInfo.CycleStart && daysFromNow >= 0) //Checking if the card's due date is relevent
                 {
                     var movingList = Lists[boardInfo.TodayIndex - daysFromNow];
                     logger.LogInformation("Moving card {cardName} to list {newList} since it is due in {daysFromNow} days", card.Name, movingList.Name, daysFromNow);
@@ -97,8 +111,15 @@ namespace BetterTrelloAutomator
                 }
             }
         }
+
         [Function("ManuallyMoveFromFuture")]
-        public Task ManuallyMoveFromFuture([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => MoveFromFuture();
+        [OpenApiOperation("MoveFromFuture", ["MovementTesting"])]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully moved any relevant tasks out of future, and into the weekly TODO cycle")]
+        public async Task<HttpResponseData> ManuallyMoveFromFuture([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req)
+        {
+            await MoveFromFuture();
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
 
         async Task SeparateNightTasks()
         {
@@ -106,16 +127,21 @@ namespace BetterTrelloAutomator
 
             foreach (var card in cards)
             {
-                if (!card.Labels.Contains(TrelloLabel.Morning, TrelloNameComparer.Instance) && card.Labels.Contains(TrelloLabel.Night, TrelloNameComparer.Instance))
+                if (!card.Labels.ContainsName(TrelloLabel.Morning) && card.Labels.ContainsName(TrelloLabel.Night))
                 {
                     await client.MoveCard(card, Lists[boardInfo.TonightIndex]);
                 }
             }
         }
-        [Function("ManuallySeparateNightTasks")]
 
-        public Task ManuallySeparateNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => SeparateNightTasks();
-        
+        [Function("ManuallySeparateNightTasks")]
+        [OpenApiOperation("SeparateNightTasks", ["MovementTesting"])]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully moved all of today's night tasks to tonight")]
+        public async Task<HttpResponseData> ManuallySeparateNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req)
+        {
+            await SeparateNightTasks();
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
         Task MergeNightTasks() => client.MoveCards(Lists[boardInfo.TonightIndex], Lists[boardInfo.TodayIndex]);
 
         [Function("MergeNightTasks")]
@@ -130,7 +156,13 @@ namespace BetterTrelloAutomator
             await MergeNightTasks();
         }
         [Function("ManuallyMergeNightTasks")]
-        public Task ManuallyMergeNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req) => MergeNightTasks();
+        [OpenApiOperation("MergeNightTasks", ["MovementTesting"])]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Moved tasks from tonight to today")]
+        public async Task<HttpResponseData> ManuallyMergeNightTasks([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req)
+        {
+            await MergeNightTasks();
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
 
 
         [Function("TransitionDays")]
@@ -147,17 +179,29 @@ namespace BetterTrelloAutomator
         }
 
         [Function("GetPersonalID")]
-        public async Task<IActionResult> GetPersonalID([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
+        [OpenApiOperation("GetPersonalID", ["Misc"])]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(string), Description = "the ID of the user who supplied the trello key and token in ENV (that's probably me)")]
+        public async Task<HttpResponseData> GetPersonalID([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
             logger.LogInformation("Getting ID");
-            return new OkObjectResult(await client.GetPersonalBoardID());
+            var id = await client.GetPersonalBoardID();
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.WriteString(id);
+            return response;
         }
 
         [Function("GetLists")]
-        public async Task<IActionResult> GetLists([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
+        [OpenApiOperation("GetLists", ["Misc"])]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(SimpleTrelloRecord[]), Description = "All the lists of the client's board")]
+        public async Task<HttpResponseData> GetLists([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req)
         {
             logger.LogInformation("User requesting to get lists");
-            return new OkObjectResult(await client.GetLists());
+            var lists = await client.GetLists();
+
+            var response =  req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(lists);
+            return response;
         }
     }
 }

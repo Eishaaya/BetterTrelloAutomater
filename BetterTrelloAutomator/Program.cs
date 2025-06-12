@@ -18,6 +18,7 @@ namespace BetterTrelloAutomator
             builder.Configuration
                 .AddEnvironmentVariables();
 
+            builder.Services.AddFunctionsWorkerDefaults();
 
 
             builder.Services
@@ -28,13 +29,35 @@ namespace BetterTrelloAutomator
                 .AddSingleton<TrelloBoardInfo>()
                 .AddHostedService<TrelloBoardInfo.StartupService>();
 
+
             builder.Logging
                 .AddConsole()
                 .SetMinimumLevel(LogLevel.Information);
 
+
             builder.Build().Run();
 
-            //Generating commit to be able to deploy to new subscription
+            #region HostBuilder setup for sanity testing
+
+            //var host = new HostBuilder()
+            //    .ConfigureAppConfiguration(m =>
+            //    {
+            //        m.AddEnvironmentVariables();
+            //    })
+            //    .ConfigureFunctionsWebApplication()
+            //    .ConfigureServices(m =>
+            //    {
+            //        m.AddApplicationInsightsTelemetryWorkerService();
+            //        m.ConfigureFunctionsApplicationInsights();
+
+            //        m.AddHttpClient();
+            //        m.AddSingleton<TrelloClient>();
+            //        m.AddTransient<TrelloBoardInfo>();
+            //        m.AddHostedService<TrelloBoardInfo.StartupService>();
+            //    })
+            //    .Build();
+
+            #endregion
         }
     }
 }

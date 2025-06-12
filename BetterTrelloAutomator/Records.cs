@@ -17,8 +17,8 @@ namespace BetterTrelloAutomator
     public record class LabeledTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
     public record class TrelloLabel(string Name, string Id, string Color) : SimpleTrelloRecord(Name, Id)
     {
-        public static TrelloLabel Night => new TrelloLabel("Night", null!, null!);
-        public static TrelloLabel Morning => new TrelloLabel("Morning", null!, null!);
+        public static string Night => "Night";
+        public static string Morning => "Morning";
     }
     public record class TrelloListPosition(string ListId, string Pos = "top")
     {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator
 {
-    enum Times
+    enum AMPM
     {
         AM = 0,
         PM = 12
@@ -22,6 +22,10 @@ namespace BetterTrelloAutomator
         /// Converts to UCT from hardcoded PST factoring in AM/PM times
         /// </summary>
         /// <returns>hour in UTC</returns>
-        public static int ToUTC(this int hour, Times timeIndicator) => (hour + (int)timeIndicator).ToUTC();
+        public static int ToUTC(this int hour, AMPM timeIndicator) => (hour + (int)timeIndicator).ToUTC();
+
+        public static bool ContainsId<TIdable>(this IEnumerable<TIdable> records, string id) where TIdable : IHasId => records.Any(m => m.Id == id);
+        public static bool ContainsName<TRecord>(this IEnumerable<TRecord> records, string name) where TRecord : SimpleTrelloRecord => records.Any(m => m.Name == name);
+
     }
 }
