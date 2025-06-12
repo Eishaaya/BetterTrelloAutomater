@@ -29,10 +29,11 @@ namespace BetterTrelloAutomator
                 .AddSingleton<TrelloBoardInfo>()
                 .AddHostedService<TrelloBoardInfo.StartupService>();
 
+            var environment = builder.Configuration["ENVIRONMENT"] ?? "LOCAL";
 
             builder.Logging
                 .AddConsole()
-                .SetMinimumLevel(LogLevel.Information);
+                .SetMinimumLevel(environment == "LOCAL"? LogLevel.Information : LogLevel.Warning);
 
 
             builder.Build().Run();
