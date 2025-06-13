@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using System.Text.Json;
@@ -71,6 +72,13 @@ namespace BetterTrelloAutomator.Dependencies
             return await response.Content.ReadAsStringAsync();
         }
 
+        async Task<HttpResponseMessage> PostResponse(string uri, HttpContent? content = null)
+        {
+            var response = await client.PostAsync(uri + authString, content);
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
+
         async Task<TRecord> GetValue<TRecord>(string uri)
         {
             var response = await GetResponse($"{uri}fields={RecordHelpers.GetFields<TRecord>()}");
@@ -103,8 +111,7 @@ namespace BetterTrelloAutomator.Dependencies
         public async Task MoveCards(SimpleTrelloRecord from, SimpleTrelloRecord to)
         {
             var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}&";
-            var response = await client.PostAsync(uri, null);
-            response.EnsureSuccessStatusCode();
+            await PostResponse(uri);
         }
 
 

@@ -21,9 +21,8 @@ namespace BetterTrelloAutomator.AzureFunctions
         [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully took steps to resolve the specific card")] //TODO, look into multiple responses
         public async Task<HttpResponseData> ManuallyResolveTickedCard([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
         {
-            var card = await JsonSerializer.DeserializeAsync<FullTrelloCard>(req.Body) ?? throw new ArgumentException($"Invalid card format");
-            await ResolveTickedCard(card);
-            return req.CreateResponse(HttpStatusCode.OK);
+            var card = await JsonSerializer.DeserializeAsync<FullTrelloCard>(req.Body) ?? throw new ArgumentException($"Invalid card format");            
+            return req.CreateResponse(await ResolveTickedCard(card));
         }
 
         public async Task<HttpStatusCode> ResolveTickedCard(FullTrelloCard card)
