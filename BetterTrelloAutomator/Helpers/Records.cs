@@ -21,9 +21,13 @@ namespace BetterTrelloAutomator.Helpers
     {
         public static string QueryInfo => "";
     }
-    public record class SimpleTrelloCard(string Name, string Id, string Start, string Due) : SimpleTrelloRecord(Name, Id);
-    public record class LabeledTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
-    public record class FullTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, Labels), IQueryableRecord
+    public record class SimpleTrelloCard(string Name, string Id, string? Start, string? Due) : SimpleTrelloRecord(Name, Id)
+    {
+        internal static SimpleTrelloCard LossyClone<TCard>(TCard card) where TCard : SimpleTrelloCard => new SimpleTrelloCard(card);
+    }
+
+    public record class LabeledTrelloCard(string Name, string Id, string? Start, string? Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
+    public record class FullTrelloCard(string Name, string Id, string? Start, string? Due, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, Labels), IQueryableRecord
     {
         public static new string QueryInfo => "checklists=all&";
     }
@@ -39,9 +43,11 @@ namespace BetterTrelloAutomator.Helpers
         public const string Night = nameof(Night);
 
         public const string Task = nameof(Task);
-        public const string Inconsistent = nameof(Inconsistent);
         public const string Reverse = nameof(Reverse);
         public const string Static = nameof(Static);
+
+        public const string Strict = nameof(Strict);
+        public const string Inconsistent = nameof(Inconsistent);
 
         public static readonly TimeUnit Daily = new (nameof(Daily), 1);
         public static readonly TimeUnit Weekly = new (nameof(Weekly), 7);

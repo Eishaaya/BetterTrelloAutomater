@@ -27,7 +27,7 @@ namespace BetterTrelloAutomator
                 .AddApplicationInsightsTelemetryWorkerService()
                 .ConfigureFunctionsApplicationInsights()
                 .AddHttpClient()
-                .AddTransient<TrelloClient>()
+                .AddSingleton<TrelloClient>()
                 .AddSingleton<TrelloBoardInfo>()
                 .AddHostedService<TrelloBoardInfo.StartupService>();
 

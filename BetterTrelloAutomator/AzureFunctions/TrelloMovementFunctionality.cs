@@ -53,7 +53,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             await MoveFromFuture();
             await SeparateNightTasks();
-        }  
+        }
 
         [Function("ManuallyTransitionDays")]
         [OpenApiOperation("TransitionDays", tags: ["MovementTesting"])]
@@ -85,27 +85,39 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             logger.LogInformation("Moving cards out of future list");
 
-            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, boardInfo.MyTimeZoneInfo);
-            now -= new TimeSpan(now.Hour, now.Minute + 1, now.Second); //getting the beginning of the day in my timezone
-
             var cards = await client.GetCards<SimpleTrelloCard>(Lists[boardInfo.FirstTodo]);
 
             foreach (var card in cards)
             {
-                string date = card.Start ?? card.Due;
-                if (date == null) continue;
+                await MoveToCorrectList(card);
+            }
+        }
 
-                var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
-                DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, boardInfo.MyTimeZoneInfo); //Getting due datetime in my timezone
+        int GetDaysToMove<TCard>(TCard card, out int maxDays) where TCard : SimpleTrelloCard
+        {
+            maxDays = boardInfo.CycleEnd - boardInfo.FirstTodo;
+            
+            string? date = card.Start ?? card.Due;
+            if (date == null) return -1;
 
-                int daysFromNow = (int)(dateTime - now).TotalDays; //How many days from now this card is due
+            var utcTime = DateTime.Parse(date, null, DateTimeStyles.AdjustToUniversal);
+            DateTime dateTime = TimeZoneInfo.ConvertTimeFromUtc(utcTime, boardInfo.MyTimeZoneInfo); //Getting due datetime in my timezone
 
-                if (daysFromNow <= boardInfo.CycleEnd - boardInfo.CycleStart && daysFromNow >= 0) //Checking if the card's due date is relevent
-                {
-                    var movingList = Lists[boardInfo.TodayIndex - daysFromNow];
-                    logger.LogInformation("Moving card {cardName} to list {newList} since it is due in {daysFromNow} days", card.Name, movingList.Name, daysFromNow);
-                    await client.MoveCard(card, new TrelloListPosition(movingList.Id));
-                }
+            int daysFromNow = (int)(dateTime - boardInfo.TodayStart).TotalDays; //How many days from now this card is due
+            
+            return Math.Min(maxDays, daysFromNow); //Finding the list to move to by time from today, capping it so it overflows into the general "future" list, or whichever is first
+        }
+
+        async Task MoveToCorrectList<TCard>(TCard card) where TCard : SimpleTrelloCard
+        {
+            int daysFromNow = GetDaysToMove(card, out int maxDays);
+
+            if (daysFromNow >= 0 && daysFromNow < maxDays) //Checking if the card's due date isn't already expired or otherwise inapplicable
+            {
+                var movingList = Lists[boardInfo.TodayIndex - daysFromNow];
+                logger.LogInformation("Moving card {cardName} to list {newList} since it is due in {daysFromNow} days", card.Name, movingList.Name, daysFromNow);
+                await client.MoveCard(card, new TrelloListPosition(movingList.Id));
+
             }
         }
 

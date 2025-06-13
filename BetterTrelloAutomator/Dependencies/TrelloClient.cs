@@ -71,14 +71,6 @@ namespace BetterTrelloAutomator.Dependencies
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync();
         }
-
-        async Task<HttpResponseMessage> PostResponse(string uri, HttpContent? content = null)
-        {
-            var response = await client.PostAsync(uri + authString, content);
-            response.EnsureSuccessStatusCode();
-            return response;
-        }
-
         async Task<TRecord> GetValue<TRecord>(string uri)
         {
             var response = await GetResponse($"{uri}fields={RecordHelpers.GetFields<TRecord>()}");
@@ -94,15 +86,26 @@ namespace BetterTrelloAutomator.Dependencies
 
         async Task PutValue<TRecord>(string uri, TRecord contentRecord, bool ignoreContent, IEnumerable<StringPair> otherChanges) where TRecord : SimpleTrelloRecord
         {
-            if (!uri.Contains('?')) throw new ArgumentException("Missing ?");
+            uri.EnsureUriFormat();
 
-            IEnumerable<StringPair> baseChanges = ignoreContent ? Enumerable.Empty<StringPair>() : RecordHelpers.GetFields(contentRecord);
+            IEnumerable<StringPair> baseChanges = ignoreContent ? [] : RecordHelpers.GetFields(contentRecord);
 
             var content = new FormUrlEncodedContent([..baseChanges,..otherChanges]);
             var response = await client.PutAsync($"{uri}{authString}", content);
             response.EnsureSuccessStatusCode();
         }
-        Task PutValue<TRecord>(string uri, TRecord contentRecord, bool ignoreContent, params StringPair[] otherChanges) where TRecord : SimpleTrelloRecord => PutValue(uri, contentRecord, ignoreContent, otherChanges.AsEnumerable());
+        Task PutValue<TRecord>(string uri, TRecord contentRecord, bool ignoreContent = false, params StringPair[] otherChanges) where TRecord : SimpleTrelloRecord => PutValue(uri, contentRecord, ignoreContent, otherChanges.AsEnumerable());
+
+
+        async Task PostValue(string uri, IEnumerable<StringPair> content)
+        {
+            uri.EnsureUriFormat();
+
+            var response = await client.PostAsync($"{uri}{authString}", new FormUrlEncodedContent(content));
+            response.EnsureSuccessStatusCode();
+        }
+        Task PostValue(string uri, params StringPair[] content) => PostValue(uri, content.AsEnumerable());
+
 
         #endregion
 
@@ -111,9 +114,14 @@ namespace BetterTrelloAutomator.Dependencies
         public async Task MoveCards(SimpleTrelloRecord from, SimpleTrelloRecord to)
         {
             var uri = $"lists/{from.Id}/moveAllCards?idBoard={boardID}&idList={to.Id}&";
-            await PostResponse(uri);
+            await PostValue(uri);
         }
 
+        public async Task UpdateCard<TCard>(TCard card) where TCard : SimpleTrelloCard
+        {
+            var uri = $"cards/{card.Id}?";
+            await PutValue(uri, card);
+        }
 
         public async Task MoveCard<TCard>(TCard card, TrelloListPosition position) where TCard : SimpleTrelloCard
         {
@@ -135,7 +143,7 @@ namespace BetterTrelloAutomator.Dependencies
         {
             logger.LogInformation("Completing item {checkItem} in card {card}", item, card);
             var uri = $"cards/{card.Id}/checkItem/{item.Id}?";
-            await PutValue(uri, item.SetState(CheckItem.Complete), false);
+            await PutValue(uri, item.SetState(CheckItem.Complete));
         }
 
         public async Task CompleteAllCheckedItems(FullTrelloCard card)
@@ -147,6 +155,12 @@ namespace BetterTrelloAutomator.Dependencies
                     await CompleteCheckItem(card, item);
                 }
             }
+        }
+
+        internal async Task CloneCard(SimpleTrelloCard card, TrelloListPosition pos)
+        {
+            await PostValue($"cards?idList={pos.IdList}&idCardSource={card.Id}&dueComplete=false&due={card.Due}&start={card.Start}&" +
+                $"keepFromSource=attachments,checklists,customFields,comments,labels,members,stickers&");
         }
 
         #endregion

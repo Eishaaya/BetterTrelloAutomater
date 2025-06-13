@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -27,9 +28,34 @@ namespace BetterTrelloAutomator.Helpers
         public static bool ContainsName<TRecord>(this IEnumerable<TRecord> records, string name) where TRecord : SimpleTrelloRecord => records.Any(m => m.Name == name);
         public static bool ContainsName<TRecord>(this IEnumerable<TRecord> records, out string? foundName, params string[] names) where TRecord : SimpleTrelloRecord
             => (foundName = names.Where(cName => records.Any(r => r.Name == cName)).FirstOrDefault()) != default;
-        public static bool ContainsTime<TRecord>(this IEnumerable<TRecord> records, out TimeUnit? foundTime, params TimeUnit[] times) where TRecord : SimpleTrelloRecord 
-            => (foundTime = times.Where(cName => records.Any(r => r.Name == cName)).FirstOrDefault()) != default(TimeUnit); //Doesn't work when default type isn't specified (TODO: figure out why)
-        
-        
+        public static bool ContainsTime<TRecord>(this IEnumerable<TRecord> records, out TimeUnit foundTime, params TimeUnit[] times) where TRecord : SimpleTrelloRecord 
+            => (foundTime = times.Where(cName => records.Any(r => r.Name == cName)).FirstOrDefault()) != default;
+
+        public static SimpleTrelloCard Simpify<TCard>(this TCard card) where TCard : SimpleTrelloCard => SimpleTrelloCard.LossyClone(card);
+
+        public static string? TrySetDate(this string? oldDateTime, DateTime newDate)
+        {
+            if (DateTime.TryParse(oldDateTime, out DateTime newDateTime))
+            {
+                newDateTime = new DateTime(newDate.Year, newDate.Month, newDate.Day, newDateTime.Hour, newDateTime.Minute, newDateTime.Second);
+                return newDateTime.ToString();
+            }
+            return null;
+        }
+
+        public static string? TryAddDays(this string? oldDate, int dayChange)
+        {
+            if (DateTime.TryParse(oldDate, out DateTime newDate))
+            {
+                newDate += TimeSpan.FromDays(dayChange);
+                return newDate.ToString();
+            }
+            return null;
+        }
+
+        public static void EnsureUriFormat(this string uri)
+        {
+            if (!uri.Contains('?') || (uri[^1] != '?' && uri[^1] != '&')) throw new ArgumentException("Missing ? or &");
+        }
     }
 }

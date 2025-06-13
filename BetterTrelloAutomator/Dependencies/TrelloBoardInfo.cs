@@ -25,12 +25,24 @@ namespace BetterTrelloAutomator.Dependencies
         internal readonly string TimeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
         internal TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
         internal SimpleTrelloRecord[] Lists { get; private set; } = null!;
+
+        internal DateTime Now => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MyTimeZoneInfo); //Getting the time in my timezone
+        internal DateTime TodayStart
+        {
+            get
+            {
+                return Now - new TimeSpan(Now.Hour, Now.Minute + 1, Now.Second); //getting the beginning of today
+            }
+        }
+
+
         internal int FirstTodo { get; private set; }
         internal int TonightIndex => TodayIndex + 1;
         internal int CycleStart => FirstTodo + 1;
         internal int CycleEnd { get; private set; }
         internal int TodayIndex { get; private set; }
         internal int DoneIndex { get; private set; }
+        internal int RoutineIndex { get; private set; }
         internal int WindDownIndex
         {
             get
@@ -46,10 +58,10 @@ namespace BetterTrelloAutomator.Dependencies
 
         public TrelloBoardInfo(TrelloClient client, ILogger<TrelloBoardInfo> logger)
         {
+            logger.LogInformation("Initializing Board Information");
+
             this.logger = logger;
             this.client = client;
-
-            logger.LogInformation("Initializing Board Information");
         }
 
         public async Task Setup()
@@ -88,7 +100,10 @@ namespace BetterTrelloAutomator.Dependencies
                 if (Lists[i].Name.Contains("done", StringComparison.OrdinalIgnoreCase))
                 {
                     DoneIndex = i;
-                    break;
+                }
+                if (Lists[i].Name.Contains("routine", StringComparison.OrdinalIgnoreCase))
+                {
+                    RoutineIndex = i;
                 }
             }
         }
