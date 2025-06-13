@@ -24,12 +24,25 @@ namespace BetterTrelloAutomator.Dependencies
 
         internal readonly string TimeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
         internal TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
-        internal SimpleTrelloRecord[] Lists { get; set; } = null!;
-        internal int FirstTodo { get; set; }
-        internal int TodayIndex { get; set; }
+        internal SimpleTrelloRecord[] Lists { get; private set; } = null!;
+        internal int FirstTodo { get; private set; }
         internal int TonightIndex => TodayIndex + 1;
         internal int CycleStart => FirstTodo + 1;
-        internal int CycleEnd { get; set; }
+        internal int CycleEnd { get; private set; }
+        internal int TodayIndex { get; private set; }
+        internal int DoneIndex { get; private set; }
+        internal int WindDownIndex
+        {
+            get
+            {
+                int posFromToday = TodayIndex + 2;
+                if (posFromToday != DoneIndex - 1)
+                {
+                    throw new InvalidOperationException($"Invalid Board structure detected, did you insert a list between {Lists[TodayIndex].Name} and {Lists[DoneIndex].Name}?");
+                }
+                return posFromToday;
+            }
+        }
 
         public TrelloBoardInfo(TrelloClient client, ILogger<TrelloBoardInfo> logger)
         {
@@ -43,7 +56,7 @@ namespace BetterTrelloAutomator.Dependencies
         {
             Lists = await client.GetLists();
 
-            for (int i = 0; i < Lists.Length; i++)
+            for (int i = 0; i < Lists.Length; i++) //Finding future TODO (or whatever its equivalent is)
             {
                 if (Lists[i].Name.Contains("TODO"))
                 {
@@ -52,7 +65,7 @@ namespace BetterTrelloAutomator.Dependencies
                 }
             }
 
-            for (int i = Lists.Length - 1; i >= 0; i--)
+            for (int i = Lists.Length - 1; i >= 0; i--) //Finding today TODO (or any buffers after it)
             {
                 if (Lists[i].Name.Contains("TODO"))
                 {
@@ -66,6 +79,15 @@ namespace BetterTrelloAutomator.Dependencies
                 if (Lists[i].Name.Contains("today", StringComparison.OrdinalIgnoreCase))
                 {
                     TodayIndex = i;
+                    break;
+                }
+            }
+
+            for (int i = CycleEnd; i < Lists.Length; i++)
+            {
+                if (Lists[i].Name.Contains("done", StringComparison.OrdinalIgnoreCase))
+                {
+                    DoneIndex = i;
                     break;
                 }
             }

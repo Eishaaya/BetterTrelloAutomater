@@ -13,19 +13,52 @@ namespace BetterTrelloAutomator.Helpers
     {
         public string Id { get; }
     }
-    public record class SimpleTrelloRecord(string Name, string Id) : IHasId;
+    interface IQueryableRecord
+    {
+        public static abstract string QueryInfo { get; }
+    }
+    public record class SimpleTrelloRecord(string Name, string Id) : IHasId, IQueryableRecord
+    {
+        public static string QueryInfo => "";
+    }
     public record class SimpleTrelloCard(string Name, string Id, string Start, string Due) : SimpleTrelloRecord(Name, Id);
     public record class LabeledTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
-    public record class FullTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels, CheckList[] IdCheckLists) : LabeledTrelloCard(Name, Id, Start, Due, Labels);
+    public record class FullTrelloCard(string Name, string Id, string Start, string Due, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, Labels), IQueryableRecord
+    {
+        public static new string QueryInfo => "checklists=all&";
+    }
     public record class TrelloLabel(string Name, string Id, string Color) : SimpleTrelloRecord(Name, Id)
     {
-        public static string Night => "Night";
-        public static string Morning => "Morning";
+        public record struct TimeUnit(string Name, int DayCount)
+        {
+            public static implicit operator string(TimeUnit timeUnit) => timeUnit.Name;
+            public static implicit operator int(TimeUnit timeUnit) => timeUnit.DayCount;
+        }
+
+        public const string Morning = nameof(Morning);
+        public const string Night = nameof(Night);
+
+        public const string Task = nameof(Task);
+        public const string Inconsistent = nameof(Inconsistent);
+        public const string Reverse = nameof(Reverse);
+        public const string Static = nameof(Static);
+
+        public static readonly TimeUnit Daily = new (nameof(Daily), 1);
+        public static readonly TimeUnit Weekly = new (nameof(Weekly), 7);
+        public static readonly TimeUnit Biweekly = new (nameof(Biweekly), 14);
+        public static readonly TimeUnit Monthly = new (nameof(Monthly), 30);
     }
-    public record class CheckList(string Id) : IHasId;
-    public record class TrelloListPosition(string ListId, string Pos = "top") : IHasId
+    public record class CheckList(string Name, string Id, CheckItem[] CheckItems) : SimpleTrelloRecord(Name, Id);
+    public record class CheckItem(string Name, string Id, string State) : SimpleTrelloRecord(Name, Id)
     {
-        string IHasId.Id => ListId;
+        public static readonly string Complete = nameof(Complete).ToLower();
+        public static readonly string Incomplete = nameof(Incomplete).ToLower();
+
+        public CheckItem SetState(string state) => new(Name, Id, state);
+    }
+    public record class TrelloListPosition(string IdList, string Pos = "top") : IHasId
+    {
+        string IHasId.Id => IdList;
 
         public static implicit operator TrelloListPosition(SimpleTrelloRecord record) => new (record.Id);
     }
