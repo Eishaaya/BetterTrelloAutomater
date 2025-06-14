@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using static BetterTrelloAutomator.Helpers.TrelloLabel;
-     
+
 
 namespace BetterTrelloAutomator.Helpers
 {
@@ -28,7 +28,7 @@ namespace BetterTrelloAutomator.Helpers
         public static bool ContainsName<TRecord>(this IEnumerable<TRecord> records, string name) where TRecord : SimpleTrelloRecord => records.Any(m => m.Name == name);
         public static bool ContainsName<TRecord>(this IEnumerable<TRecord> records, out string? foundName, params string[] names) where TRecord : SimpleTrelloRecord
             => (foundName = names.Where(cName => records.Any(r => r.Name == cName)).FirstOrDefault()) != default;
-        public static bool ContainsTime<TRecord>(this IEnumerable<TRecord> records, out TimeUnit foundTime, params TimeUnit[] times) where TRecord : SimpleTrelloRecord 
+        public static bool ContainsTime<TRecord>(this IEnumerable<TRecord> records, out TimeUnit foundTime, params TimeUnit[] times) where TRecord : SimpleTrelloRecord
             => (foundTime = times.Where(cName => records.Any(r => r.Name == cName)).FirstOrDefault()) != default;
 
         public static SimpleTrelloCard Simpify<TCard>(this TCard card) where TCard : SimpleTrelloCard => SimpleTrelloCard.LossyClone(card);
@@ -56,6 +56,32 @@ namespace BetterTrelloAutomator.Helpers
         public static void EnsureUriFormat(this string uri)
         {
             if (!uri.Contains('?') || (uri[^1] != '?' && uri[^1] != '&')) throw new ArgumentException("Missing ? or &");
+        }
+
+        public static DayOfWeek? AsDayOfWeek(this string input)
+        {
+            if (input.Length < 2) return null; //String too short to evaluate
+
+            input = input.ToLower();
+
+            for (DayOfWeek day = DayOfWeek.Sunday; day <= DayOfWeek.Saturday; day++)
+            {
+                string dayString = day.ToString().ToLower();
+                if (dayString[0] != input[0]) continue;
+
+                if (input[1] == dayString[1]) //Checking matching character from start, EG: mo, mon, mond, monda, monday
+                {
+                    return day;
+                }
+
+
+                if (input.Contains(dayString)) //Checking if day is included: EG: Lunch on tuesday
+                {
+                    return day;
+                }
+            }
+
+            return null;
         }
     }
 }

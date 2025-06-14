@@ -27,6 +27,8 @@ namespace BetterTrelloAutomator.Dependencies
         internal SimpleTrelloRecord[] Lists { get; private set; } = null!;
 
         internal DateTime Now => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MyTimeZoneInfo); //Getting the time in my timezone
+        internal DayOfWeek TodayDay => (Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0)).DayOfWeek;
+        internal DateTime TonightStart => new DateTime(Now.Year, Now.Month, Now.Day, Constants.NightStartHour, Constants.NightStartMinute, 0);
         internal DateTime TodayStart
         {
             get
@@ -41,6 +43,7 @@ namespace BetterTrelloAutomator.Dependencies
         internal int CycleStart => FirstTodo + 1;
         internal int CycleEnd { get; private set; }
         internal int TodayIndex { get; private set; }
+        internal int TomorrowIndex => TodayIndex - 1;
         internal int DoneIndex { get; private set; }
         internal int RoutineIndex { get; private set; }
         internal int WindDownIndex
