@@ -21,13 +21,13 @@ namespace BetterTrelloAutomator.Helpers
     {
         public static string QueryInfo => "";
     }
-    public record class SimpleTrelloCard(string Name, string Id, string? Start, string? Due) : SimpleTrelloRecord(Name, Id)
+    public record class SimpleTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete) : SimpleTrelloRecord(Name, Id)
     {
-        internal static SimpleTrelloCard LossyClone<TCard>(TCard card) where TCard : SimpleTrelloCard => new SimpleTrelloCard(card);
+        internal static SimpleTrelloCard LossyClone<TCard>(TCard card) where TCard : SimpleTrelloCard => new (card);
     }
 
-    public record class LabeledTrelloCard(string Name, string Id, string? Start, string? Due, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due);
-    public record class FullTrelloCard(string Name, string Id, string? Start, string? Due, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, Labels), IQueryableRecord
+    public record class LabeledTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due, DueComplete);
+    public record class FullTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, DueComplete, Labels), IQueryableRecord
     {
         public static new string QueryInfo => "checklists=all&";
     }
@@ -54,13 +54,13 @@ namespace BetterTrelloAutomator.Helpers
         public static readonly TimeUnit Biweekly = new (nameof(Biweekly), 14);
         public static readonly TimeUnit Monthly = new (nameof(Monthly), 30);
     }
-    public record class CheckList(string Name, string Id, CheckItem[] CheckItems) : SimpleTrelloRecord(Name, Id);
-    public record class CheckItem(string Name, string Id, string State) : SimpleTrelloRecord(Name, Id)
+    public record class CheckList(string Name, string Id, List<CheckItem> CheckItems) : SimpleTrelloRecord(Name, Id);
+    public record class CheckItem(string Name, string Id, string State, float Pos) : SimpleTrelloRecord(Name, Id)
     {
         public static readonly string Complete = nameof(Complete).ToLower();
         public static readonly string Incomplete = nameof(Incomplete).ToLower();
 
-        public CheckItem SetState(string state) => new(Name, Id, state);
+        public CheckItem SetState(string state) => new(Name, Id, state, Pos);
     }
     public record class TrelloListPosition(string IdList, string Pos = "top") : IHasId
     {

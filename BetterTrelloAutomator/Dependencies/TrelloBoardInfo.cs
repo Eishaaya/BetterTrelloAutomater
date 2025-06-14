@@ -22,20 +22,20 @@ namespace BetterTrelloAutomator.Dependencies
         readonly ILogger logger;
         readonly TrelloClient client;
 
-        internal readonly string TimeZone = "Pacific Standard Time"; //TODO: ping my phone or laptop to get its actual location
-        internal TimeZoneInfo MyTimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+        internal readonly int TimeZoneOffset = -7; //TODO: ping my phone or laptop to get its actual location
         internal SimpleTrelloRecord[] Lists { get; private set; } = null!;
 
-        internal DateTime Now => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MyTimeZoneInfo); //Getting the time in my timezone
+        internal DateTimeOffset Now => DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(TimeZoneOffset)); //Getting the time in my timezone
         internal DayOfWeek TodayDay => (Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0)).DayOfWeek;
-        internal DateTime TonightStart => new DateTime(Now.Year, Now.Month, Now.Day, Constants.NightStartHour, Constants.NightStartMinute, 0);
-        internal DateTime TodayStart
+        internal DateTimeOffset TonightStart => new(Now.Year, Now.Month, Now.Day, Constants.NightStartHour, Constants.NightStartMinute, 0, Now.Offset);
+        internal DateTimeOffset TodayStart
         {
             get
             {
                 return Now - new TimeSpan(Now.Hour, Now.Minute + 1, Now.Second); //getting the beginning of today
             }
         }
+        internal DateTimeOffset TomorrowStart => TodayStart + TimeSpan.FromDays(1);
 
 
         internal int FirstTodo { get; private set; }

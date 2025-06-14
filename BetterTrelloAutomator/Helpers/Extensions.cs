@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Linq;
 using System.Security.Policy;
 using System.Text;
@@ -33,19 +34,26 @@ namespace BetterTrelloAutomator.Helpers
 
         public static SimpleTrelloCard Simpify<TCard>(this TCard card) where TCard : SimpleTrelloCard => SimpleTrelloCard.LossyClone(card);
 
-        public static string? TrySetDate(this string? oldDateTime, DateTime newDate)
+        public static string? TrySetDate(this string? oldDateTimeOffset, DateTimeOffset newDate)
         {
-            if (DateTime.TryParse(oldDateTime, out DateTime newDateTime))
+            if (DateTimeOffset.TryParse(oldDateTimeOffset, null, DateTimeStyles.AdjustToUniversal, out DateTimeOffset newDateTimeOffset))
             {
-                newDateTime = new DateTime(newDate.Year, newDate.Month, newDate.Day, newDateTime.Hour, newDateTime.Minute, newDateTime.Second);
-                return newDateTime.ToString();
+                newDateTimeOffset = newDateTimeOffset.ToOffset(newDate.Offset);
+
+                if (newDateTimeOffset > newDate)
+                {
+                    newDate = newDateTimeOffset; //Avoiding moving tasks less than they should, only farther
+                }
+
+                newDateTimeOffset = new DateTimeOffset(newDate.Year, newDate.Month, newDate.Day, newDateTimeOffset.Hour, newDateTimeOffset.Minute, newDateTimeOffset.Second, newDateTimeOffset.Offset);
+                return newDateTimeOffset.ToString();
             }
             return null;
         }
 
         public static string? TryAddDays(this string? oldDate, int dayChange)
         {
-            if (DateTime.TryParse(oldDate, out DateTime newDate))
+            if (DateTimeOffset.TryParse(oldDate, out DateTimeOffset newDate))
             {
                 newDate += TimeSpan.FromDays(dayChange);
                 return newDate.ToString();

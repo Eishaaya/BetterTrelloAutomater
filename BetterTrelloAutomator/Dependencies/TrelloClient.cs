@@ -4,8 +4,6 @@ using Microsoft.Extensions.Logging;
 
 using System.Text.Json;
 
-using StringPair = System.Collections.Generic.KeyValuePair<string, string?>;
-
 namespace BetterTrelloAutomator.Dependencies
 {
     public class TrelloClient

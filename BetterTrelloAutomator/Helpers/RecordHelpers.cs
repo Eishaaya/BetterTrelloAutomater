@@ -58,10 +58,18 @@ namespace BetterTrelloAutomator.Helpers
 
     static class RecordHelpers
     {
-        public static string GetFields<TRecord>() 
+        public static string GetFields<TRecord>()
             => string.Join(',', (typeof(TRecord)).GetProperties().Select(m => JsonNamingPolicy.CamelCase.ConvertName(m.Name)));
-        public static IEnumerable<KeyValuePair<string, string?>> GetFields<TRecord>(TRecord record) 
-            => record!.GetType().GetProperties().Select(prop => 
-                new KeyValuePair<string, string?>(JsonNamingPolicy.CamelCase.ConvertName(prop.Name), $"{prop.GetValue(record)}"));
+        public static IEnumerable<KeyValuePair<string, string>> GetFields<TRecord>(TRecord record)
+            => record!.GetType().GetProperties().Select(prop =>
+            {
+                var name = JsonNamingPolicy.CamelCase.ConvertName(prop.Name);
+                var value = $"{prop.GetValue(record)}";
+                if (prop.PropertyType != typeof(string))
+                {
+                    value = JsonNamingPolicy.CamelCase.ConvertName(value);
+                }
+                return new KeyValuePair<string, string>(name, value);
+            });
     }
 }
