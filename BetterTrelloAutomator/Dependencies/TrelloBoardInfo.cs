@@ -22,10 +22,11 @@ namespace BetterTrelloAutomator.Dependencies
         readonly ILogger logger;
         readonly TrelloClient client;
 
-        internal readonly int TimeZoneOffset = -7; //TODO: ping my phone or laptop to get its actual location
+        internal readonly int TimeZoneOffsetHours = -7; //TODO: ping my phone or laptop to get its actual location
+        internal TimeSpan TimeZoneOffset => TimeSpan.FromHours(TimeZoneOffsetHours);
         internal SimpleTrelloRecord[] Lists { get; private set; } = null!;
 
-        internal DateTimeOffset Now => DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(TimeZoneOffset)); //Getting the time in my timezone
+        internal DateTimeOffset Now => DateTimeOffset.UtcNow.ToOffset(TimeZoneOffset); //Getting the time in my timezone
         internal DayOfWeek TodayDay => (Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0)).DayOfWeek;
         internal DateTimeOffset TonightStart => new(Now.Year, Now.Month, Now.Day, Constants.NightStartHour, Constants.NightStartMinute, 0, Now.Offset);
         internal DateTimeOffset TodayStart

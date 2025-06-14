@@ -35,13 +35,10 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             var todayDate = boardInfo.Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0); //Counting anytime before "morning" as the day before. This is means that midnight of the 16th is still treated as the 15th
 
-            string? start = card.Start;
-            string due = card.Due ?? start ?? DateTimeOffset.UtcNow.ToString();
+            DateTimeOffset? start = card.Start?.ToOffset(boardInfo.TimeZoneOffset);
+            DateTimeOffset due = (card.Due ?? start ?? DateTimeOffset.UtcNow).ToOffset(boardInfo.TimeZoneOffset);            
 
-            string? newStart = null;
-            string newDue = null!;
-
-            string dateString = start ?? due;
+            DateTimeOffset knownDate = start ?? due;
 
             bool isStrict = card.Labels.ContainsName(TrelloLabel.Strict);
 
@@ -53,10 +50,9 @@ namespace BetterTrelloAutomator.AzureFunctions
                     isTask = true;
                     logger.LogInformation("Periodic task detected");
 
-                    if (DateTimeOffset.TryParse(card.Due, out var taskDue))
+                    if (card.Due != null)
                     {
-                        newDue = card.Due;
-                        if (taskDue < DateTimeOffset.UtcNow || DateTimeOffset.Parse(newStart ?? newDue!) > taskDue)
+                        if (card.Due.Value < DateTimeOffset.UtcNow || (start ?? due) > card.Due)
                         {
                             logger.LogInformation("Completing periodic task");
                             await client.MoveCard(card, Lists[boardInfo.DoneIndex]);
@@ -82,7 +78,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                     if (time == TrelloLabel.Monthly)
                     {
-                        var date = DateTimeOffset.Parse(dateString);
+                        var date = knownDate;
 
                         var newDate = date + TimeSpan.FromDays(dayChange = TrelloLabel.Weekly.DayCount * 4);
 
@@ -93,33 +89,33 @@ namespace BetterTrelloAutomator.AzureFunctions
                     }
 
                     //Getting new times from originals
-                    newStart = start.TryAddDays(dayChange);
-                    newDue = due.TryAddDays(dayChange)!;
+                    start = start?.AddDays(dayChange);
+                    due = due.AddDays(dayChange);
                 }
                 else
                 {
                     logger.LogInformation("Card is not strict");
                     //Getting new times from now
-                    newStart = start.TrySetDate(todayDate);
-                    newDue = due.TrySetDate(todayDate)!;
+                    start = start?.TrySetDate(todayDate);
+                    due = due.TrySetDate(todayDate)!;
 
-                    newStart = start.TryAddDays(dayChange);
-                    newDue = due.TryAddDays(dayChange)!;
+                    start = start?.AddDays(dayChange);
+                    due = due.AddDays(dayChange);
                 }
 
                 if (await HandleRoutineTask()) return HttpStatusCode.OK;
 
                 await client.MoveCard(card, Lists[boardInfo.RoutineIndex]);
 
-                var newCard = new SimpleTrelloCard(card.Name, card.Id, newStart, newDue, false);
+                var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
                 //Resetting date to now
-                newStart = start.TrySetDate(todayDate + TimeSpan.FromDays(dayChange));
+                start = start?.TrySetDate(todayDate + TimeSpan.FromDays(dayChange));
                 if (!isTask)
                 {
-                    newDue = due.TrySetDate(todayDate + TimeSpan.FromDays(dayChange))!;
+                    due = due.TrySetDate(todayDate + TimeSpan.FromDays(dayChange))!;
                 }
-                newCard = new SimpleTrelloCard(card.Name, card.Id, newStart, newDue, false);
+                newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
                 var correctIndex = GetIndexToMoveTo(newCard);
 
@@ -136,6 +132,8 @@ namespace BetterTrelloAutomator.AzureFunctions
                 bool complete = true;
 
                 int totalIncompleteCount = 0;
+
+                DayOfWeek cardDay = boardInfo.Now > knownDate ? boardInfo.TodayDay : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
 
                 foreach (var checkList in card.Checklists)
                 {
@@ -154,22 +152,20 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                         var checkItemDay = currItem.Name.AsDayOfWeek();
 
-                        if (isStrict)
+                        if (isStrict || cardDay <= checkItemDay) //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
                         {
-                            checkItemDay ??= (DayOfWeek)(-1); //Storing a garbage value, so we ignore non-weekdays
-                        }
+                            if (!isStrict)
+                            {
+                                if (checkItemDay == null) continue;
 
-                        if (checkItemDay == null) continue;
+                                if (checkItemDay == previousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
+                                {
+                                    incompleteCount--;
+                                }
+                                previousDay = checkItemDay;
+                            }
 
-                        if (checkItemDay == previousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
-                        {
-                            incompleteCount--;
-                        }
-                        previousDay = checkItemDay;
-
-                        if (isStrict || boardInfo.TodayDay <= checkItemDay) //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
-                        {
-                            if (incompleteCount == 0) //If we haven't completed more than one "bunch" of cards
+                            if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
                                 if (isDivided && totalIncompleteCount == 0 && boardInfo.Now >= boardInfo.TonightStart) continue; // Skipping the first card for the set day if it's nighttime
 
@@ -190,14 +186,14 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 if (!isStrict)
                 {
-                    newStart = start.TrySetDate(todayDate);
-                    newDue = due.TrySetDate(todayDate)!;
+                    start = start?.TrySetDate(todayDate);
+                    due = due.TrySetDate(todayDate)!;
                 }
-                newStart = start.TryAddDays(1);
-                newDue = due.TryAddDays(1)!;
+                start = start?.AddDays(1);
+                due = due.AddDays(1)!;
 
 
-                var newCard = new SimpleTrelloCard(card.Name, card.Id, newStart, newDue, false);
+                var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
                 bool isDaily = card.Labels.ContainsName(TrelloLabel.Daily);
                 int movingIndex = isDaily ? GetIndexToMoveTo(newCard) : boardInfo.WindDownIndex;
@@ -213,10 +209,10 @@ namespace BetterTrelloAutomator.AzureFunctions
                         logger.LogInformation("Moving incomplete divided task to tonight");
                         await client.MoveCard(card, new(Lists[boardInfo.TonightIndex].Id, "bottom"));
                     }
-                    else if (isDaily && DateTimeOffset.Parse(newDue) > boardInfo.TomorrowStart)
+                    else if (isDaily && due > boardInfo.TomorrowStart)
                     {
                         logger.LogInformation("Moving extant card {newCard} to {movingIndex}", newCard, movingIndex);
-                        await client.MoveCard(card, Lists[GetIndexToMoveTo(card)]);
+                        await client.MoveCard(card, Lists[movingIndex]);
                     }
                 }
                 else

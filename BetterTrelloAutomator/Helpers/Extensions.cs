@@ -34,32 +34,21 @@ namespace BetterTrelloAutomator.Helpers
 
         public static SimpleTrelloCard Simpify<TCard>(this TCard card) where TCard : SimpleTrelloCard => SimpleTrelloCard.LossyClone(card);
 
-        public static string? TrySetDate(this string? oldDateTimeOffset, DateTimeOffset newDate)
+        public static DateTimeOffset TrySetDate(this DateTimeOffset oldDateTimeOffset, DateTimeOffset newDate)
         {
-            if (DateTimeOffset.TryParse(oldDateTimeOffset, null, DateTimeStyles.AdjustToUniversal, out DateTimeOffset newDateTimeOffset))
+            oldDateTimeOffset = oldDateTimeOffset.ToOffset(newDate.Offset);
+
+            if (oldDateTimeOffset > newDate)
             {
-                newDateTimeOffset = newDateTimeOffset.ToOffset(newDate.Offset);
-
-                if (newDateTimeOffset > newDate)
-                {
-                    newDate = newDateTimeOffset; //Avoiding moving tasks less than they should, only farther
-                }
-
-                newDateTimeOffset = new DateTimeOffset(newDate.Year, newDate.Month, newDate.Day, newDateTimeOffset.Hour, newDateTimeOffset.Minute, newDateTimeOffset.Second, newDateTimeOffset.Offset);
-                return newDateTimeOffset.ToString();
+                newDate = oldDateTimeOffset; //Avoiding moving tasks less than they should, only farther
             }
-            return null;
+
+            oldDateTimeOffset = new DateTimeOffset(newDate.Year, newDate.Month, newDate.Day, oldDateTimeOffset.Hour, oldDateTimeOffset.Minute, oldDateTimeOffset.Second, oldDateTimeOffset.Offset);
+            return oldDateTimeOffset;
         }
 
-        public static string? TryAddDays(this string? oldDate, int dayChange)
-        {
-            if (DateTimeOffset.TryParse(oldDate, out DateTimeOffset newDate))
-            {
-                newDate += TimeSpan.FromDays(dayChange);
-                return newDate.ToString();
-            }
-            return null;
-        }
+        public static DateTimeOffset AddDays(this DateTimeOffset oldDate, int dayChange) => oldDate + TimeSpan.FromDays(dayChange);
+
 
         public static void EnsureUriFormat(this string uri)
         {

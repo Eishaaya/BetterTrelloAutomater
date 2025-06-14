@@ -101,12 +101,11 @@ namespace BetterTrelloAutomator.AzureFunctions
         {
             int maxDays = boardInfo.CycleEnd - boardInfo.FirstTodo;
             
-            string? date = card.Start ?? card.Due;
-            if (date == null) return -1;
+            DateTimeOffset? dateTime = card.Start ?? card.Due;
 
-            var utcTime = DateTimeOffset.Parse(date);
+            if (dateTime == null) return -1;
 
-            int daysFromNow = (int)(utcTime - boardInfo.TodayStart).TotalDays; //How many days from now this card is due
+            int daysFromNow = (int)(dateTime.Value - boardInfo.TodayStart).TotalDays; //How many days from now this card is due
             
             return boardInfo.TodayIndex - Math.Clamp(daysFromNow, 0, maxDays); //Finding the list to move to by time from today, capping it so it overflows into the general "future" list, or whichever is first
         }

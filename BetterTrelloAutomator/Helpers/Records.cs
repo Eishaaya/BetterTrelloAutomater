@@ -21,13 +21,13 @@ namespace BetterTrelloAutomator.Helpers
     {
         public static string QueryInfo => "";
     }
-    public record class SimpleTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete) : SimpleTrelloRecord(Name, Id)
+    public record class SimpleTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete) : SimpleTrelloRecord(Name, Id)
     {
         internal static SimpleTrelloCard LossyClone<TCard>(TCard card) where TCard : SimpleTrelloCard => new (card);
     }
 
-    public record class LabeledTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due, DueComplete);
-    public record class FullTrelloCard(string Name, string Id, string? Start, string? Due, bool DueComplete, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, DueComplete, Labels), IQueryableRecord
+    public record class LabeledTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due, DueComplete);
+    public record class FullTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, DueComplete, Labels), IQueryableRecord
     {
         public static new string QueryInfo => "checklists=all&";
     }
