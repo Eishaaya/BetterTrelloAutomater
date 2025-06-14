@@ -125,8 +125,9 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 #endregion
             }
-            else if (card.Labels.ContainsName(out _, TrelloLabel.Daily, TrelloLabel.Reverse/*, TrelloLabel.Static*/))
+            else if (card.Labels.ContainsName(out _, TrelloLabel.Daily, TrelloLabel.Reverse))
             {
+                #region Daily Tasks
                 bool isDivided = card.Labels.ContainsName(TrelloLabel.Morning) && card.Labels.ContainsName(TrelloLabel.Night);
 
                 bool complete = true;
@@ -225,22 +226,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                     await client.CloneCard(newCard, Lists[movingIndex]);
                 }
 
-
-
-
-                //if (complete) //Completing any non-day-specific tasks on a completed card
-                //{
-                //    foreach (var checkList in card.Checklists)
-                //    {
-                //        foreach (var currItem in checkList.CheckItems)
-                //        {
-                //            if (currItem.State == CheckItem.Incomplete && currItem.Name.AsDayOfWeek() == null)
-                //            {
-                //                await client.CompleteCheckItem(card, currItem);
-                //            }
-                //        }
-                //    }
-                //}
+                #endregion
             }
             else if (card.Labels.ContainsName(TrelloLabel.Task))
             {
@@ -248,6 +234,12 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 await client.MoveCard(card, Lists[boardInfo.DoneIndex]);
                 await client.CompleteAllCheckedItems(card);
+            }
+            else if (card.Labels.ContainsName(TrelloLabel.Static))
+            {
+                await client.MoveCard(card, Lists[boardInfo.RoutineIndex]);
+                await client.CompleteAllCheckedItems(card);
+                await client.CloneCard(card.Simpify(), Lists[boardInfo.WindDownIndex]);
             }
             else
             {
