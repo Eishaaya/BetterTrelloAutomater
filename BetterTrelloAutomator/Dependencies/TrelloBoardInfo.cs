@@ -29,14 +29,15 @@ namespace BetterTrelloAutomator.Dependencies
         internal DateTimeOffset Now => DateTimeOffset.UtcNow.ToOffset(TimeZoneOffset); //Getting the time in my timezone
         internal DayOfWeek TodayDay => (Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0)).DayOfWeek;
         internal DateTimeOffset TonightStart => new(Now.Year, Now.Month, Now.Day, Constants.NightStartHour, Constants.NightStartMinute, 0, Now.Offset);
-        internal DateTimeOffset TodayStart
+        internal DateTimeOffset YesterdayEnd
         {
             get
             {
                 return Now - new TimeSpan(Now.Hour, Now.Minute + 1, Now.Second); //getting the beginning of today
             }
         }
-        internal DateTimeOffset TomorrowStart => TodayStart + TimeSpan.FromDays(1);
+        internal DateTimeOffset TodayStart => YesterdayEnd + TimeSpan.FromMinutes(2);
+        internal DateTimeOffset TomorrowStart => YesterdayEnd + TimeSpan.FromDays(1);
 
 
         internal int FirstTodo { get; private set; }

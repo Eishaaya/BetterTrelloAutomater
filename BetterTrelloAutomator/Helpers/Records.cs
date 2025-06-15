@@ -24,6 +24,10 @@ namespace BetterTrelloAutomator.Helpers
     public record class SimpleTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete) : SimpleTrelloRecord(Name, Id)
     {
         internal static SimpleTrelloCard LossyClone<TCard>(TCard card) where TCard : SimpleTrelloCard => new (card);
+        public SimpleTrelloCard SetStart(DateTimeOffset? val) => new SimpleTrelloCard(Name, Id, val, Due, DueComplete);
+        public SimpleTrelloCard SetDue(DateTimeOffset? val) => new SimpleTrelloCard(Name, Id, Start, val, DueComplete);
+        public SimpleTrelloCard SetComplete(bool val) => new SimpleTrelloCard(Name, Id, Start, Due, val);
+
     }
 
     public record class LabeledTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due, DueComplete);

@@ -34,11 +34,11 @@ namespace BetterTrelloAutomator.Helpers
 
         public static SimpleTrelloCard Simpify<TCard>(this TCard card) where TCard : SimpleTrelloCard => SimpleTrelloCard.LossyClone(card);
 
-        public static DateTimeOffset TrySetDate(this DateTimeOffset oldDateTimeOffset, DateTimeOffset newDate)
+        public static DateTimeOffset TrySetDate(this DateTimeOffset oldDateTimeOffset, DateTimeOffset newDate, TimeSpan buffer = default)
         {
             oldDateTimeOffset = oldDateTimeOffset.ToOffset(newDate.Offset);
 
-            if (oldDateTimeOffset > newDate)
+            if (oldDateTimeOffset > newDate - buffer)
             {
                 newDate = oldDateTimeOffset; //Avoiding moving tasks less than they should, only farther
             }
@@ -46,9 +46,6 @@ namespace BetterTrelloAutomator.Helpers
             oldDateTimeOffset = new DateTimeOffset(newDate.Year, newDate.Month, newDate.Day, oldDateTimeOffset.Hour, oldDateTimeOffset.Minute, oldDateTimeOffset.Second, oldDateTimeOffset.Offset);
             return oldDateTimeOffset;
         }
-
-        public static DateTimeOffset AddDays(this DateTimeOffset oldDate, int dayChange) => oldDate + TimeSpan.FromDays(dayChange);
-
 
         public static void EnsureUriFormat(this string uri)
         {

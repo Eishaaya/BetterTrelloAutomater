@@ -87,14 +87,17 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             var cards = await client.GetCards<SimpleTrelloCard>(Lists[boardInfo.FirstTodo]);
 
+            List<Task> cardMovements = [];
+
             foreach (var card in cards)
             {
                 int moveIndex = GetIndexToMoveTo(card);
                 if (moveIndex <= boardInfo.FirstTodo) continue; //Skipping cards that would move back into future
 
-                await client.MoveCard(card, Lists[moveIndex]);
-
+                cardMovements.Add(client.MoveCard(card, Lists[moveIndex]));
             }
+
+            await Task.WhenAll(cardMovements);
         }
 
         int GetIndexToMoveTo<TCard>(TCard card) where TCard : SimpleTrelloCard
@@ -105,7 +108,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             if (dateTime == null) return -1;
 
-            int daysFromNow = (int)(dateTime.Value - boardInfo.TodayStart).TotalDays; //How many days from now this card is due
+            int daysFromNow = (int)(dateTime.Value - boardInfo.YesterdayEnd).TotalDays; //How many days from now this card is due
             
             return boardInfo.TodayIndex - Math.Clamp(daysFromNow, 0, maxDays); //Finding the list to move to by time from today, capping it so it overflows into the general "future" list, or whichever is first
         }
@@ -127,7 +130,7 @@ namespace BetterTrelloAutomator.AzureFunctions
             {
                 if (!card.Labels.ContainsName(TrelloLabel.Morning) && card.Labels.ContainsName(TrelloLabel.Night))
                 {
-                    await client.MoveCard(card, Lists[boardInfo.TonightIndex]);
+                    await client.MoveCard(card, Lists[boardInfo.TonightIndex]); //Leaving awaits to avoid race condition & maintain set stability
                 }
             }
         }

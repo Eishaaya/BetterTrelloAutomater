@@ -19,35 +19,67 @@ namespace BetterTrelloAutomator.AzureFunctions
 {
     public partial class TrelloFunctionality
     {
-        [Function("ManuallyResolveTickedCard")]
-        [OpenApiOperation("ResolveTickedCard")]
+        [Function("ManuallyResolveCard")]
+        [OpenApiOperation("ResolveCard")]
         [OpenApiRequestBody("application/json", typeof(FullTrelloCard), Description = "Card to resolve")]
         [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully took steps to resolve the specific card")] //TODO, look into multiple responses
-        public async Task<HttpResponseData> ManuallyResolveTickedCard([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
+        public async Task<HttpResponseData> ManuallyResolveCard([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
         {
             var card = await JsonSerializer.DeserializeAsync<FullTrelloCard>(req.Body) ?? throw new ArgumentException($"Invalid card format");
             return req.CreateResponse(await ResolveTickedCard(card));
         }
 
+        [Function("ManuallyResolveTickedCards")]
+        [OpenApiOperation("ResolveTickedCards")]
+        [OpenApiRequestBody("application/json", typeof(int), Description = "List index to search in")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Successfully took steps to resolve all cards marked complete in the specified list")] //TODO, look into multiple responses
+        public async Task<HttpResponseData> ManuallyResolveTickedCards([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
+        {
+            var listIndex = await JsonSerializer.DeserializeAsync<int>(req.Body);
+
+            var cards = await client.GetCards<FullTrelloCard>(Lists[listIndex]);
+            foreach (var card in cards)
+            {
+                if (!card.DueComplete) continue;
+
+                var response = await ResolveTickedCard(card);
+                if (response != HttpStatusCode.OK) return req.CreateResponse(response);
+            }
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
+
         public async Task<HttpStatusCode> ResolveTickedCard(FullTrelloCard card)
         {
+            #region Setup
+
             logger.LogInformation("Received card {card} to resolve", card);
 
             var todayDate = boardInfo.Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0); //Counting anytime before "morning" as the day before. This is means that midnight of the 16th is still treated as the 15th
 
             DateTimeOffset? start = card.Start?.ToOffset(boardInfo.TimeZoneOffset);
-            DateTimeOffset due = (card.Due ?? start ?? DateTimeOffset.UtcNow).ToOffset(boardInfo.TimeZoneOffset);            
+            DateTimeOffset due = (card.Due ?? start ?? DateTimeOffset.UtcNow).ToOffset(boardInfo.TimeZoneOffset);
 
             DateTimeOffset knownDate = start ?? due;
 
             bool isStrict = card.Labels.ContainsName(TrelloLabel.Strict);
+            bool isTask = card.Labels.ContainsName(TrelloLabel.Task);
 
-            bool isTask = false;
+            foreach (var checklist in card.Checklists)
+            {
+                checklist.CheckItems.Sort((a, b) => a.Pos.CompareTo(b.Pos));
+            }
+
+            List<Task> tasksToDo = [];
+
+            #endregion
+
+            #region Helper Functions
+
             async Task<bool> HandleRoutineTask() //Returns if further action should be skipped
             {
-                if (card.Labels.ContainsName(TrelloLabel.Task))
+                if (isTask)
                 {
-                    isTask = true;
                     logger.LogInformation("Periodic task detected");
 
                     if (card.Due != null)
@@ -63,14 +95,60 @@ namespace BetterTrelloAutomator.AzureFunctions
                 return false;
             }
 
+            Task TryCompleteItems() //Complete all items until reaching already completed ones. This reduces API calls & leaves intentional blanks alive
+            {
+                List<Task> checks = [];
+                foreach (var checklist in card.Checklists)
+                {
+                    for (int i = checklist.CheckItems.Count - 1; i >= 0; i--)
+                    {
+                        if (checklist.CheckItems[i].State == CheckItem.Complete) break;
+
+                        checks.Add(client.CompleteCheckItem(card, checklist.CheckItems[i]));
+                    }
+                }
+                return Task.WhenAll(checks);
+            }
+
+            void TrySetDates()
+            {
+                start = start?.TrySetDate(todayDate);
+                if (!isTask)
+                {
+                    due = due.TrySetDate(todayDate)!;
+                }
+            }
+            void TryPushDates(double dayChange)
+            {
+                start = start?.AddDays(dayChange);
+                if (!isTask)
+                {
+                    due = due.AddDays(dayChange);
+                }
+            }
+
+            #endregion
+
+            #region Main Logic
+
             if (card.Labels.ContainsTime(out var time, TrelloLabel.Monthly, TrelloLabel.Biweekly, TrelloLabel.Weekly))
             {
                 #region Periodic Tasks
 
-                await client.CompleteAllCheckedItems(card);
-                logger.LogInformation("Resolving {TimeType} card", time.Name);
+                #region Setup
 
+                logger.LogInformation("Resolving {TimeType} card", time.Name);
                 int dayChange = time.DayCount;
+
+                #endregion
+
+                #region Handle Checklist
+
+                tasksToDo.Add(TryCompleteItems());
+
+                #endregion
+
+                #region Dates
 
                 if (isStrict)
                 {
@@ -87,59 +165,60 @@ namespace BetterTrelloAutomator.AzureFunctions
                             dayChange += TrelloLabel.Weekly.DayCount;
                         }
                     }
-
-                    //Getting new times from originals
-                    start = start?.AddDays(dayChange);
-                    due = due.AddDays(dayChange);
+                    else
+                    {
+                        //Getting new times from originals
+                        TryPushDates(dayChange);
+                    }
                 }
                 else
                 {
                     logger.LogInformation("Card is not strict");
-                    //Getting new times from now
-                    start = start?.TrySetDate(todayDate);
-                    due = due.TrySetDate(todayDate)!;
 
-                    start = start?.AddDays(dayChange);
-                    due = due.AddDays(dayChange);
+                    //Getting new times from now
+                    TrySetDates();
+                    TryPushDates(dayChange);
                 }
+
+                #endregion
+
+                #region Movement/Cloning
 
                 if (await HandleRoutineTask()) return HttpStatusCode.OK;
 
-                await client.MoveCard(card, Lists[boardInfo.RoutineIndex]);
+                tasksToDo.Add(client.MoveCard(card, Lists[boardInfo.RoutineIndex]));
 
                 var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
-                //Resetting date to now
-                start = start?.TrySetDate(todayDate + TimeSpan.FromDays(dayChange));
-                if (!isTask)
-                {
-                    due = due.TrySetDate(todayDate + TimeSpan.FromDays(dayChange))!;
-                }
-                newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
-
                 var correctIndex = GetIndexToMoveTo(newCard);
-
                 logger.LogInformation("Moving cloned card {newCard} to list at index {correctIndex}", newCard, correctIndex);
+                tasksToDo.Add(client.CloneCard(newCard, Lists[correctIndex]));
 
-                await client.CloneCard(newCard, Lists[correctIndex]);
+                #endregion
 
                 #endregion
             }
-            else if (card.Labels.ContainsName(out _, TrelloLabel.Daily, TrelloLabel.Reverse))
+            else if (card.Labels.ContainsName(out var cardType, TrelloLabel.Daily, TrelloLabel.Reverse))
             {
                 #region Daily Tasks
+
+                #region Setup
+
+                logger.LogInformation("Resolving {cardType} card", cardType);
                 bool isDivided = card.Labels.ContainsName(TrelloLabel.Morning) && card.Labels.ContainsName(TrelloLabel.Night);
 
                 bool complete = true;
 
                 int totalIncompleteCount = 0;
 
-                DayOfWeek cardDay = boardInfo.Now > knownDate ? boardInfo.TodayDay : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
+                #endregion
+
+                #region Handle Checklist
+
+                DayOfWeek cardDay = boardInfo.Now >= knownDate ? boardInfo.TodayDay : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
 
                 foreach (var checkList in card.Checklists)
                 {
-                    checkList.CheckItems.Sort((a, b) => a.Pos.CompareTo(b.Pos)); //Sorting items by list position (they default to creation date per ID)
-
                     int incompleteCount = totalIncompleteCount;
                     DayOfWeek? previousDay = null;
 
@@ -153,24 +232,24 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                         var checkItemDay = currItem.Name.AsDayOfWeek();
 
+                        if (checkItemDay == null)
+                        {
+                            if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
+                        }
+                        else if (checkItemDay == previousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
+                        {
+                            incompleteCount--;
+                        }
+                        previousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
+
                         if (isStrict || cardDay <= checkItemDay) //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
                         {
-                            if (!isStrict)
-                            {
-                                if (checkItemDay == null) continue;
-
-                                if (checkItemDay == previousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
-                                {
-                                    incompleteCount--;
-                                }
-                                previousDay = checkItemDay;
-                            }
 
                             if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
                                 if (isDivided && totalIncompleteCount == 0 && boardInfo.Now >= boardInfo.TonightStart) continue; // Skipping the first card for the set day if it's nighttime
 
-                                await client.CompleteCheckItem(card, currItem);
+                                tasksToDo.Add(client.CompleteCheckItem(card, currItem));
                             }
                             incompleteCount++;
                         }
@@ -185,14 +264,28 @@ namespace BetterTrelloAutomator.AzureFunctions
                     complete &= incompleteCount <= 1;
                 }
 
-                if (!isStrict)
-                {
-                    start = start?.TrySetDate(todayDate);
-                    due = due.TrySetDate(todayDate)!;
-                }
-                start = start?.AddDays(1);
-                due = due.AddDays(1)!;
+                #endregion
 
+                #region Dates
+
+                bool isDivididing = isDivided && boardInfo.Now < boardInfo.TonightStart && totalIncompleteCount > 1;
+
+                if (isDivididing)
+                {
+                    TryPushDates(.5);
+                }
+                else
+                {
+                    if (!isStrict)
+                    {
+                        TrySetDates();
+                    }
+                    TryPushDates(1);
+                }
+
+                #endregion
+
+                #region Movement/Cloning
 
                 var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
@@ -203,50 +296,93 @@ namespace BetterTrelloAutomator.AzureFunctions
                 {
                     logger.LogInformation("Card is not complete");
 
-                    await client.UpdateCard(newCard);
-
-                    if (isDivided && boardInfo.Now < boardInfo.TonightStart && totalIncompleteCount > 1) //If a divided task is incomplete  
+                    if (isDivididing) //If a divided task is incomplete  
                     {
                         logger.LogInformation("Moving incomplete divided task to tonight");
-                        await client.MoveCard(card, new(Lists[boardInfo.TonightIndex].Id, "bottom"));
+                        tasksToDo.Add(client.UpdateCard(newCard, new(Lists[boardInfo.TonightIndex].Id, "bottom"))); //Moving to tonight, but not applying any date changes
                     }
                     else if (isDaily && due > boardInfo.TomorrowStart)
                     {
                         logger.LogInformation("Moving extant card {newCard} to {movingIndex}", newCard, movingIndex);
-                        await client.MoveCard(card, Lists[movingIndex]);
+                        tasksToDo.Add(client.UpdateCard(newCard, Lists[movingIndex]));
                     }
                 }
                 else
                 {
+                    //Being completed means all lists are filled OR the last day of the week is filled
+                    //Any remaining unticked checkItems findable through the back are descriptive for the daily task and should be ticked:
+
                     if (await HandleRoutineTask()) return HttpStatusCode.OK;
 
-                    await client.MoveCard(card, Lists[boardInfo.RoutineIndex]);
+                    tasksToDo.Add(client.MoveCard(card, Lists[boardInfo.RoutineIndex]));
 
                     logger.LogInformation("Moving cloned card {newCard} to {movingIndex}", newCard, movingIndex);
-                    await client.CloneCard(newCard, Lists[movingIndex]);
+                    tasksToDo.Add(client.CloneCard(newCard, Lists[movingIndex]));
+
+                    await Task.WhenAll(tasksToDo);
+
+                    tasksToDo = [TryCompleteItems()];
                 }
+                #endregion
 
                 #endregion
             }
-            else if (card.Labels.ContainsName(TrelloLabel.Task))
+            else if (isTask)
             {
+                #region Setup
+
                 logger.LogInformation("Completing standard task");
 
-                await client.MoveCard(card, Lists[boardInfo.DoneIndex]);
-                await client.CompleteAllCheckedItems(card);
+                #endregion
+
+                #region Handle Checklist
+
+                tasksToDo.Add(TryCompleteItems());
+
+                #endregion
+
+                #region Movement
+
+                tasksToDo.Add(client.MoveCard(card, Lists[boardInfo.DoneIndex]));
+
+                #endregion
             }
             else if (card.Labels.ContainsName(TrelloLabel.Static))
             {
-                await client.MoveCard(card, Lists[boardInfo.RoutineIndex]);
-                await client.CompleteAllCheckedItems(card);
-                await client.CloneCard(card.Simpify(), Lists[boardInfo.WindDownIndex]);
+                #region Setup
+
+                logger.LogInformation("Completing static task");
+
+                #endregion
+
+                #region Handle Checklist
+
+                tasksToDo.Add(TryCompleteItems());
+
+                #endregion
+
+                #region Movement/Cloning
+
+                tasksToDo.Add(client.MoveCard(card, Lists[boardInfo.RoutineIndex]));
+                tasksToDo.Add(client.CloneCard(card.Simpify(), Lists[boardInfo.WindDownIndex]));
+
+                #endregion
             }
             else
             {
                 logger.LogCritical("Received unhandleable card");
                 return HttpStatusCode.BadRequest;
             }
+
+            #endregion
+
+            #region Finish
+
+            await Task.WhenAll(tasksToDo);
+
             return HttpStatusCode.OK;
+
+            #endregion
         }
     }
 }

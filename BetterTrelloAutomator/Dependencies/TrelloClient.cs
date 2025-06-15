@@ -126,6 +126,11 @@ namespace BetterTrelloAutomator.Dependencies
             var uri = $"cards/{card.Id}?";
             await PutValue(uri, card, true, RecordHelpers.GetFields(position));
         }
+        public async Task UpdateCard<TCard>(TCard card, TrelloListPosition position) where TCard : SimpleTrelloCard
+        {
+            var uri = $"cards/{card.Id}?";
+            await PutValue(uri, card, false, RecordHelpers.GetFields(position));
+        }
 
         #endregion
 
