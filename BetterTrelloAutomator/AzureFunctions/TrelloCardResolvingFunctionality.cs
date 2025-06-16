@@ -48,7 +48,6 @@ namespace BetterTrelloAutomator.AzureFunctions
             return req.CreateResponse(HttpStatusCode.OK);
         }
 
-
         public async Task<HttpStatusCode> ResolveTickedCard(FullTrelloCard card)
         {
             #region Setup
@@ -220,34 +219,37 @@ namespace BetterTrelloAutomator.AzureFunctions
                 foreach (var checkList in card.Checklists)
                 {
                     int incompleteCount = totalIncompleteCount;
-                    DayOfWeek? previousDay = null;
+                    DayOfWeek? releventPreviousDay = null;
+
+                    DayOfWeek? lastSkippedDay = null;
 
                     foreach (var currItem in checkList.CheckItems)
                     {
+                        var checkItemDay = currItem.Name.AsDayOfWeek();
+
                         if (currItem.State != CheckItem.Incomplete)
                         {
-                            previousDay = null;
+                            lastSkippedDay = checkItemDay;
+                            releventPreviousDay = null;
                             continue;
                         }
 
-                        var checkItemDay = currItem.Name.AsDayOfWeek();
 
                         if (checkItemDay == null)
                         {
                             if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
                         }
-                        else if (checkItemDay == previousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
+                        else if (checkItemDay == releventPreviousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
                         {
                             incompleteCount--;
                         }
-                        previousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
+                        releventPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
 
                         if (isStrict || cardDay <= checkItemDay) //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
                         {
-
                             if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
-                                if (isDivided && totalIncompleteCount == 0 && boardInfo.Now >= boardInfo.TonightStart) continue; // Skipping the first card for the set day if it's nighttime
+                                if (isDivided && boardInfo.Now >= boardInfo.TonightStart && lastSkippedDay != checkItemDay) continue; // Skipping the first card for the set day if it's nighttime
 
                                 tasksToDo.Add(client.CompleteCheckItem(card, currItem));
                             }
