@@ -308,6 +308,11 @@ namespace BetterTrelloAutomator.AzureFunctions
                         logger.LogInformation("Moving extant card {newCard} to {movingIndex}", newCard, movingIndex);
                         tasksToDo.Add(client.UpdateCard(newCard, Lists[movingIndex]));
                     }
+                    else
+                    {
+                        logger.LogInformation("Updating extant card {newCard}", newCard);
+                        tasksToDo.Add(client.UpdateCard(newCard));
+                    }
                 }
                 else
                 {
