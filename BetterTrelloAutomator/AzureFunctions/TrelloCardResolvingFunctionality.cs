@@ -214,7 +214,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 #region Handle Checklist
 
-                DayOfWeek cardDay = boardInfo.Now >= knownDate ? boardInfo.TodayDay : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
+                DayOfWeek cardDay = boardInfo.Now >= knownDate ? todayDate.DayOfWeek : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
 
                 foreach (var checkList in card.Checklists)
                 {
@@ -249,7 +249,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                         {
                             if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
-                                if (isDivided && boardInfo.Now >= boardInfo.TonightStart && lastSkippedDay != checkItemDay) continue; // Skipping the first card for the set day if it's nighttime
+                                if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay) continue; // Skipping the first card for the set day if it's nighttime
 
                                 tasksToDo.Add(client.CompleteCheckItem(card, currItem));
                             }
@@ -270,7 +270,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 #region Dates
 
-                bool isDivididing = isDivided && boardInfo.Now < boardInfo.TonightStart && totalIncompleteCount > 1;
+                bool isDivididing = isDivided && todayDate.TimeOfDay < boardInfo.TonightStart.TimeOfDay && totalIncompleteCount > 1;
 
                 if (isDivididing)
                 {
