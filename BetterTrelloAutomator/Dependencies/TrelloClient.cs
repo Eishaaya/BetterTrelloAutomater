@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator.Dependencies
 {
@@ -138,6 +139,11 @@ namespace BetterTrelloAutomator.Dependencies
         public Task<TCard[]> GetCards<TCard>(SimpleTrelloRecord list) where TCard : SimpleTrelloCard
             => GetValues<TCard>($"lists/{list.Id}/cards");
 
+
+        internal Task<TCard> GetCard<TCard>(string cardId) where TCard : SimpleTrelloCard
+            => GetValue<TCard>($"cards/{cardId}?");
+        
+
         #endregion
 
         #region checkLists
@@ -165,6 +171,18 @@ namespace BetterTrelloAutomator.Dependencies
             await PostValue($"cards?idList={pos.IdList}&idCardSource={card.Id}&dueComplete=false&due={card.Due}&start={card.Start}&" +
                 $"keepFromSource=attachments,checklists,customFields,comments,labels,members,stickers&");
         }
+
+        internal async Task<string> CreateBoardHook(string callBackURL, string description = "")
+        {
+            var response = await client.PostAsync($"tokens/{token}/webhooks/?key={key}", new FormUrlEncodedContent([
+                new (nameof(description), description),
+                new (nameof(callBackURL), callBackURL),
+                new ("idModel", boardID)
+                ]));
+
+            return await response.Content.ReadAsStringAsync();
+        }
+
 
         #endregion
     }

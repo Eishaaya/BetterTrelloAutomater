@@ -1,6 +1,7 @@
 ﻿using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using System;
@@ -272,7 +273,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 bool isDivididing = isDivided && todayDate.TimeOfDay < boardInfo.TonightStart.TimeOfDay && totalIncompleteCount > 1;
 
-                if (isDivididing)
+                if (isDivided)
                 {
                     TryPushDates(.5);
                 }
@@ -390,6 +391,35 @@ namespace BetterTrelloAutomator.AzureFunctions
             return HttpStatusCode.OK;
 
             #endregion
+        }
+
+        [Function("ResolveCard")]
+        [OpenApiOperation("ResolveTickedCard")]
+        [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
+        public async Task<HttpResponseData> ResolveTickedCard([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        {
+            var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body);
+
+            if (response!.Action.Type != "updateCard") return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+
+            var basicCard = response!.Action.Data.Card;
+
+            var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
+            if (fullCard.DueComplete == false) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+
+            var output = await ResolveTickedCard(fullCard);
+            return req.CreateResponse(output);
+        }
+
+        public async Task<HttpResponseData> CreateResolutionHook([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, IConfiguration config)
+        {
+            string url = config["RESOLVECARDURL"] ?? throw new ArgumentNullException("Desired URL null or nonexistant");
+
+            var hookOutput = await client.CreateBoardHook(url, "Webhook to trigger card resolution logic");
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteStringAsync(hookOutput);
+            return response;
         }
     }
 }

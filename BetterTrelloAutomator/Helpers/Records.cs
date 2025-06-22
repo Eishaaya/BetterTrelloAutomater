@@ -72,4 +72,10 @@ namespace BetterTrelloAutomator.Helpers
 
         public static implicit operator TrelloListPosition(SimpleTrelloRecord record) => new (record.Id);
     }
+
+    record WebhookResponse(Action Action, Model Model, Webhook Webhook);
+    record Action(ActionData Data, string Type);
+    record ActionData(SimpleTrelloRecord Card);
+    record Webhook(); //Placeholder
+    record Model(); //Placeholder
 }
