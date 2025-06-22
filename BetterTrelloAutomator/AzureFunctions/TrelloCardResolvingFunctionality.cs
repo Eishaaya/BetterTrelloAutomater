@@ -412,7 +412,6 @@ namespace BetterTrelloAutomator.AzureFunctions
             var basicCard = response.Action.Data.Card;
             logger.LogError($"NOW VALIDATING: {response}");
 
-            return default;
 
             try
             {
