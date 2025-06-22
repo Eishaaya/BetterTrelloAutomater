@@ -396,9 +396,9 @@ namespace BetterTrelloAutomator.AzureFunctions
         [Function("ResolveCard")]
         [OpenApiOperation("ResolveTickedCard")]
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
-        public async Task<HttpResponseData> ResolveTickedCard([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body);
+            var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body, client.CaseInsensitive);
 
             if (response!.Action.Type != "updateCard") return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 

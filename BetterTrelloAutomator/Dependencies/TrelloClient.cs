@@ -17,7 +17,7 @@ namespace BetterTrelloAutomator.Dependencies
         readonly HttpClient client;
         readonly ILogger<TrelloClient> logger;
 
-        readonly JsonSerializerOptions caseInsensitive = new() { PropertyNameCaseInsensitive = true };
+        public readonly JsonSerializerOptions CaseInsensitive = new() { PropertyNameCaseInsensitive = true };
 
         public TrelloClient(HttpClient httpClient, IConfiguration config, ILogger<TrelloClient> myLogger)
         {
@@ -73,14 +73,14 @@ namespace BetterTrelloAutomator.Dependencies
         async Task<TRecord> GetValue<TRecord>(string uri)
         {
             var response = await GetResponse($"{uri}fields={RecordHelpers.GetFields<TRecord>()}");
-            return JsonSerializer.Deserialize<TRecord>(response, caseInsensitive)!;
+            return JsonSerializer.Deserialize<TRecord>(response, CaseInsensitive)!;
         }
         async Task<TRecord[]> GetValues<TRecord>(string uri) where TRecord : IQueryableRecord
         {
             string fullUri = $"{uri}?{TRecord.QueryInfo}fields={RecordHelpers.GetFields<TRecord>()}";
             var response = await GetResponse(fullUri);
 
-            return JsonSerializer.Deserialize<TRecord[]>(response, caseInsensitive)!;
+            return JsonSerializer.Deserialize<TRecord[]>(response, CaseInsensitive)!;
         }
 
         async Task PutValue<TRecord>(string uri, TRecord contentRecord, bool ignoreContent, IEnumerable<StringPair> otherChanges) where TRecord : SimpleTrelloRecord

@@ -30,9 +30,24 @@ namespace BetterTrelloAutomator.Helpers
 
     }
 
-    public record class LabeledTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete, TrelloLabel[] Labels) : SimpleTrelloCard(Name, Id, Start, Due, DueComplete);
-    public record class FullTrelloCard(string Name, string Id, DateTimeOffset? Start, DateTimeOffset? Due, bool DueComplete, TrelloLabel[] Labels, CheckList[] Checklists) : LabeledTrelloCard(Name, Id, Start, Due, DueComplete, Labels), IQueryableRecord
+    public record class LabeledTrelloCard : SimpleTrelloCard
     {
+        public TrelloLabel[] Labels { get; init; }
+        public LabeledTrelloCard(string name, string id, DateTimeOffset? start, DateTimeOffset? due, bool dueComplete, TrelloLabel[] labels) 
+            : base(name, id, start, due, dueComplete)
+        {
+            Labels = labels ?? [];
+        }
+    }
+    public record class FullTrelloCard : LabeledTrelloCard, IQueryableRecord
+    {
+        public CheckList[] Checklists { get; init; }
+        public FullTrelloCard(string name, string id, DateTimeOffset? start, DateTimeOffset? due, bool dueComplete, TrelloLabel[] labels, CheckList[] checklists) 
+            : base(name, id, start, due, dueComplete, labels)
+        {
+            Checklists = checklists ?? [];
+        }
+
         public static new string QueryInfo => "checklists=all&";
     }
     public record class TrelloLabel(string Name, string Id, string Color) : SimpleTrelloRecord(Name, Id)
