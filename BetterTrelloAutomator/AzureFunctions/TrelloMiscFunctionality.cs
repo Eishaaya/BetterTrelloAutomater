@@ -21,7 +21,7 @@ public partial class TrelloFunctionality
         var id = await client.GetPersonalBoardID();
 
         var response = req.CreateResponse(HttpStatusCode.OK);
-        response.WriteString(id);
+        await response.WriteStringAsync(id);
         return response;
     }
 
