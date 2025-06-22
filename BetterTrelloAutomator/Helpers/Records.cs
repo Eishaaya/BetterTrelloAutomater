@@ -72,6 +72,8 @@ namespace BetterTrelloAutomator.Helpers
         public static readonly TimeUnit Weekly = new (nameof(Weekly), 7);
         public static readonly TimeUnit Biweekly = new (nameof(Biweekly), 14);
         public static readonly TimeUnit Monthly = new (nameof(Monthly), 30);
+
+        public const string AutoMove = nameof(AutoMove);
     }
     public record class CheckList(string Name, string Id, List<CheckItem> CheckItems) : SimpleTrelloRecord(Name, Id);
     public record class CheckItem(string Name, string Id, string State, float Pos) : SimpleTrelloRecord(Name, Id)

@@ -53,6 +53,8 @@ namespace BetterTrelloAutomator.AzureFunctions
         {
             #region Setup
 
+            boardInfo.StringMovingCardIDs.Add(card.Id);
+
             logger.LogInformation("Received card {card} to resolve", card);
 
             var todayDate = boardInfo.Now - new TimeSpan(Constants.DayStartHour, Constants.DayStartMinute, 0); //Counting anytime before "morning" as the day before. This is means that midnight of the 16th is still treated as the 15th
@@ -402,15 +404,19 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             logger.LogInformation("Webhook triggered");
             var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body, client.CaseInsensitive);
-
-            if (response!.Action.Type != "updateCard") return req.CreateResponse(HttpStatusCode.PreconditionFailed);
-
             var basicCard = response!.Action.Data.Card;
+
+            //we should object lock this to be safe
+            if (response!.Action.Type != "updateCard" || boardInfo.StringMovingCardIDs.Contains(basicCard.Id)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+
 
             var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
             if (fullCard.DueComplete == false) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             var output = await ResolveTickedCard(fullCard);
+
+            boardInfo.StringMovingCardIDs.Remove(basicCard.Id);
+
             return req.CreateResponse(output);
         }
 
