@@ -423,15 +423,33 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             logger.LogError($"NO PROBLEM VALIDATING: {response}");
 
+            FullTrelloCard fullCard;
+            try
+            {
 
-            var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
+                fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
+
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("FAILLED TO GET CARD " + ex);
+                throw ex;
+            }
             if (fullCard.DueComplete == false) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             var output = await ResolveTickedCard(fullCard);
 
             //boardInfo.StringMovingCardIDs.Remove(basicCard.Id);
-
-            return req.CreateResponse(output);
+            try
+            {
+                return req.CreateResponse(output);
+            } 
+            catch (Exception ex)
+            {
+                logger.LogError($"FAILED TO PROCESS {fullCard}");
+                logger.LogError($"EXCEPTION: {ex}");
+                throw ex;
+            }
         }
 
         [Function("CreateResolutionHook")]
