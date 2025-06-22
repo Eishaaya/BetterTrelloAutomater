@@ -403,15 +403,23 @@ namespace BetterTrelloAutomator.AzureFunctions
             var input = await req.ReadAsStringAsync();
 
             logger.LogInformation("Webhook triggered");
-            logger.LogError(input);
 
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
             var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
-            var basicCard = response!.Action.Data.Card;
+            var basicCard = response.Action.Data.Card;
 
-            //we should object lock this to be safe
-            if (response!.Action.Type != "updateCard" || response!.Action.memberCreator.Username.Contains("Bot")) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+            try
+            {
+
+                //we should object lock this to be safe
+                if (response.Action.Type != "updateCard" || response!.Action.MemberCreator.Username.Contains("Bot")) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+
+            }
+            catch
+            {
+                logger.LogError($"PROBLEM VALIDATING: {response}");
+            }
 
 
             var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
