@@ -402,12 +402,17 @@ namespace BetterTrelloAutomator.AzureFunctions
         {
             var input = await req.ReadAsStringAsync();
 
+
+
             logger.LogInformation("Webhook triggered");
 
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
             var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
             var basicCard = response.Action.Data.Card;
+            logger.LogError($"NOW VALIDATING: {response}");
+
+            return default;
 
             try
             {
@@ -418,10 +423,10 @@ namespace BetterTrelloAutomator.AzureFunctions
             }
             catch
             {
-                logger.LogError($"PROBLEM VALIDATING: {response}");
+                logger.LogError($"PROBLEM VALIDATING");
             }
 
-            logger.LogError($"NO PROBLEM VALIDATING: {response}");
+
 
             FullTrelloCard fullCard;
             try
