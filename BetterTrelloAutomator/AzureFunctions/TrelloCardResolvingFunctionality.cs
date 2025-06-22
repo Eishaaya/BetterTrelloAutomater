@@ -400,10 +400,14 @@ namespace BetterTrelloAutomator.AzureFunctions
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
         public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "head", "post")] HttpRequestData req)
         {
-            if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
+            var input = await req.ReadAsStringAsync();
 
             logger.LogInformation("Webhook triggered");
-            var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body, client.CaseInsensitive);
+            logger.LogError(input);
+
+            if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
+
+            var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
             var basicCard = response!.Action.Data.Card;
 
             //we should object lock this to be safe
