@@ -172,19 +172,19 @@ namespace BetterTrelloAutomator.Dependencies
                 $"keepFromSource=attachments,checklists,customFields,comments,labels,members,stickers&");
         }
 
-        internal async Task<string> CreateBoardHook(string callBackURL, string description = "")
+
+
+        #endregion
+        internal async Task<string> CreateBoardHook(string callbackURL, string description = "")
         {
             var response = await client.PostAsync($"tokens/{token}/webhooks/?key={key}", new FormUrlEncodedContent([
                 new (nameof(description), description),
-                new (nameof(callBackURL), callBackURL),
+                new (nameof(callbackURL), callbackURL),
                 new ("idModel", boardID)
                 ]));
 
             return await response.Content.ReadAsStringAsync();
         }
-
-
-        #endregion
     }
 
 }

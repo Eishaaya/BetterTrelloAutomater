@@ -396,8 +396,11 @@ namespace BetterTrelloAutomator.AzureFunctions
         [Function("ResolveCard")]
         [OpenApiOperation("ResolveTickedCard")]
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
-        public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "head", "post")] HttpRequestData req)
         {
+            if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
+
+            logger.LogInformation("Webhook triggered");
             var response = await JsonSerializer.DeserializeAsync<WebhookResponse>(req.Body, client.CaseInsensitive);
 
             if (response!.Action.Type != "updateCard") return req.CreateResponse(HttpStatusCode.PreconditionFailed);
@@ -411,9 +414,11 @@ namespace BetterTrelloAutomator.AzureFunctions
             return req.CreateResponse(output);
         }
 
-        public async Task<HttpResponseData> CreateResolutionHook([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, IConfiguration config)
+        [Function("CreateResolutionHook")]
+        [OpenApiOperation("CreateResolutionHook")]
+        public async Task<HttpResponseData> CreateResolutionHook([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req)
         {
-            string url = config["RESOLVECARDURL"] ?? throw new ArgumentNullException("Desired URL null or nonexistant");
+            string url = cardResolutionURL ?? throw new ArgumentNullException("Desired URL null or nonexistant");
 
             var hookOutput = await client.CreateBoardHook(url, "Webhook to trigger card resolution logic");
 

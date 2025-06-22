@@ -25,6 +25,8 @@ namespace BetterTrelloAutomator.AzureFunctions
         SimpleTrelloRecord[] Lists => boardInfo.Lists;
 
         readonly bool timersEnabled;
+        readonly string cardResolutionURL;
+
         public TrelloFunctionality(TrelloClient client, TrelloBoardInfo boardInfo, ILogger<TrelloFunctionality> logger, IConfiguration config)
         {
             this.client = client;
@@ -34,6 +36,8 @@ namespace BetterTrelloAutomator.AzureFunctions
             logger.LogInformation("INIT TO FUNCTIONALITY # {InstanceCount}", Instances++);
 
             string? timersEnabled = config["ENABLE_TRELLO_TIMERS"];
+            cardResolutionURL = config["RESOLVECARDURL"]!;
+
             if (!bool.TryParse(timersEnabled, out this.timersEnabled))
             {
                 logger.LogWarning("FAILED TO READ TIMER ENABLING CONFIG, DEFAULTING TO FALSE");
