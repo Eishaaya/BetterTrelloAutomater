@@ -53,7 +53,7 @@ namespace BetterTrelloAutomator.AzureFunctions
         {
             #region Setup
 
-            boardInfo.StringMovingCardIDs.Add(card.Id);
+            //boardInfo.StringMovingCardIDs.Add(card.Id);
 
             logger.LogInformation("Received card {card} to resolve", card);
 
@@ -407,7 +407,7 @@ namespace BetterTrelloAutomator.AzureFunctions
             var basicCard = response!.Action.Data.Card;
 
             //we should object lock this to be safe
-            if (response!.Action.Type != "updateCard" || boardInfo.StringMovingCardIDs.Contains(basicCard.Id)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+            if (response!.Action.Type != "updateCard" || response!.Action.Member.Username.Contains("Bot")) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
 
             var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
@@ -415,7 +415,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             var output = await ResolveTickedCard(fullCard);
 
-            boardInfo.StringMovingCardIDs.Remove(basicCard.Id);
+            //boardInfo.StringMovingCardIDs.Remove(basicCard.Id);
 
             return req.CreateResponse(output);
         }

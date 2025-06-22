@@ -62,7 +62,7 @@ namespace BetterTrelloAutomator.Dependencies
             }
         }
 
-        public List<string> StringMovingCardIDs { get; } = [];
+        //public List<string> StringMovingCardIDs { get; } = [];
         public TrelloBoardInfo(TrelloClient client, ILogger<TrelloBoardInfo> logger)
         {
             logger.LogInformation("Initializing Board Information");
