@@ -398,7 +398,7 @@ namespace BetterTrelloAutomator.AzureFunctions
         [Function("ResolveCard")]
         [OpenApiOperation("ResolveTickedCard")]
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
-        public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "head", "post")] HttpRequestData req)
+        public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "post", "head")] HttpRequestData req)
         {
             var input = await req.ReadAsStringAsync();
 
@@ -413,7 +413,7 @@ namespace BetterTrelloAutomator.AzureFunctions
             {
 
                 //we should object lock this to be safe
-                if (response.Action.Type != "updateCard" || response!.Action.MemberCreator.Username.Contains("Bot")) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+                if (response.Action.Type != "updateCard" || response!.Action.MemberCreator.FullName.Contains("Bot", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             }
             catch

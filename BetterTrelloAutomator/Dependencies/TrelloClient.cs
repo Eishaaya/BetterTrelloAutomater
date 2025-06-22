@@ -141,7 +141,7 @@ namespace BetterTrelloAutomator.Dependencies
 
 
         internal Task<TCard> GetCard<TCard>(string cardId) where TCard : SimpleTrelloCard
-            => GetValue<TCard>($"cards/{cardId}?checklists=all");
+            => GetValue<TCard>($"cards/{cardId}?checklists=all&");
         
 
         #endregion
