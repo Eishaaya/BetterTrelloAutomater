@@ -421,6 +421,8 @@ namespace BetterTrelloAutomator.AzureFunctions
                 logger.LogError($"PROBLEM VALIDATING: {response}");
             }
 
+            logger.LogError($"NO PROBLEM VALIDATING: {response}");
+
 
             var fullCard = await client.GetCard<FullTrelloCard>(basicCard.Id);
             if (fullCard.DueComplete == false) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
