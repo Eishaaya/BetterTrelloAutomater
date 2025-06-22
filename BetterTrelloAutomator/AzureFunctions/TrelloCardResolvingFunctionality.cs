@@ -395,7 +395,7 @@ namespace BetterTrelloAutomator.AzureFunctions
             #endregion
         }
 
-        [Function("ResolveCard")]
+        [Function("AutoResolveCard")]
         [OpenApiOperation("ResolveTickedCard")]
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
         public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "post", "head")] HttpRequestData req)
