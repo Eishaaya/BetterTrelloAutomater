@@ -92,7 +92,8 @@ namespace BetterTrelloAutomator.Helpers
 
     record WebhookResponse(Action Action, Model Model, Webhook Webhook);
     record Action(ActionData Data, string Type, BoardMember MemberCreator);
-    record ActionData(SimpleTrelloRecord Card);
+    record OldCard(bool? DueComplete);
+    record ActionData(SimpleTrelloCard Card, OldCard Old);
     record BoardMember(string Id, string Username, string FullName);
     record Webhook(); //Placeholder
     record Model(); //Placeholder

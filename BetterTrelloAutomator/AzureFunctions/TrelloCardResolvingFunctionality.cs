@@ -409,23 +409,38 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
-            logger.LogError($"RAW INPUT: {input}");
+            logger.LogInformation($"RAW INPUT: {input}");
             var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
 
 
             var basicCard = response.Action.Data.Card;
-            logger.LogError($"NOW VALIDATING: {response}");
+            logger.LogInformation($"NOW VALIDATING: {response}");
 
 
             try
             {
+                if (response.Action.Type != "updateCard")
+                {
+                    logger.LogInformation("Skipping Unimportant action");
+                    return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+                }
+                if (basicCard.DueComplete == false)
+                {
+                    logger.LogInformation("Skipping unticked card");
+                    return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+                }
+                if (response.Action.Data.Old?.DueComplete == true)
+                {
+                    logger.LogInformation("Skipping unchanged or already ticked card");
+                    return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+                }
 
-                if (response.Action.Type != "updateCard" || response!.Action.MemberCreator.FullName.Contains("Bot", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
+                //if (response!.Action.MemberCreator.FullName.Contains("Bot", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             }
-            catch
+            catch (Exception ex)
             {
-                logger.LogError($"PROBLEM VALIDATING");
+                logger.LogError($"PROBLEM VALIDATING {response}, \nThrew: {ex}");
             }
 
 
@@ -442,7 +457,6 @@ namespace BetterTrelloAutomator.AzureFunctions
                 logger.LogError("FAILLED TO GET CARD " + ex);
                 throw ex;
             }
-            if (fullCard.DueComplete == false) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             var output = await ResolveTickedCard(fullCard);
 
@@ -450,7 +464,7 @@ namespace BetterTrelloAutomator.AzureFunctions
             try
             {
                 return req.CreateResponse(output);
-            } 
+            }
             catch (Exception ex)
             {
                 logger.LogError($"FAILED TO PROCESS {fullCard}");
