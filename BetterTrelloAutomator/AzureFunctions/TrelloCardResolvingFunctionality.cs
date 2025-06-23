@@ -402,13 +402,16 @@ namespace BetterTrelloAutomator.AzureFunctions
         {
             var input = await req.ReadAsStringAsync();
 
-
+            await Task.Delay(5000);
 
             logger.LogInformation("Webhook triggered");
 
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
             var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
+
+            logger.LogError(input);
+
             var basicCard = response.Action.Data.Card;
             logger.LogError($"NOW VALIDATING: {response}");
 
