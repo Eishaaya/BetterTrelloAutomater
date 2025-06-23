@@ -164,16 +164,16 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                         var newDate = date + TimeSpan.FromDays(dayChange = TrelloLabel.Weekly.DayCount * 4);
 
-                        if (newDate.Day > date.Day)
+                        var beginningOfDueWeek = (newDate.Day / TrelloLabel.Weekly.DayCount) * TrelloLabel.Weekly.DayCount;
+
+                        if (newDate.Day <= beginningOfDueWeek)
                         {
                             dayChange += TrelloLabel.Weekly.DayCount;
                         }
                     }
-                    else
-                    {
-                        //Getting new times from originals
-                        TryPushDates(dayChange);
-                    }
+
+                    //Getting new times from originals
+                    TryPushDates(dayChange);
                 }
                 else
                 {
@@ -254,8 +254,11 @@ namespace BetterTrelloAutomator.AzureFunctions
                         {
                             if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
-                                if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay) continue; // Skipping the first card for the set day if it's nighttime
-
+                                if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
+                                {
+                                    lastSkippedDay = checkItemDay;
+                                    continue; // Skipping the first card for the set day if it's nighttime
+                                }
                                 tasksToDo.Add(client.CompleteCheckItem(card, currItem));
                             }
                             incompleteCount++;
@@ -405,7 +408,6 @@ namespace BetterTrelloAutomator.AzureFunctions
             logger.LogInformation("Webhook triggered");
             var input = await req.ReadAsStringAsync();
 
-            await Task.Delay(5000);
 
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
