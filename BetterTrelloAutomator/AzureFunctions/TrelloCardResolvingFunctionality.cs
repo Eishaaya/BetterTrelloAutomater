@@ -74,6 +74,8 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             List<Task> tasksToDo = [];
 
+
+
             #endregion
 
             #region Helper Functions
@@ -400,17 +402,16 @@ namespace BetterTrelloAutomator.AzureFunctions
         [OpenApiRequestBody("application/json", typeof(WebhookResponse), Description = "Webhook trigger info")]
         public async Task<HttpResponseData> ResolveTickedCardFromWebhook([HttpTrigger(AuthorizationLevel.Anonymous, "post", "head")] HttpRequestData req)
         {
+            logger.LogInformation("Webhook triggered");
             var input = await req.ReadAsStringAsync();
 
             await Task.Delay(5000);
 
-            logger.LogInformation("Webhook triggered");
-
             if (req.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.OK);
 
+            logger.LogError($"RAW INPUT: {input}");
             var response = JsonSerializer.Deserialize<WebhookResponse>(input, client.CaseInsensitive);
 
-            logger.LogError(input);
 
             var basicCard = response.Action.Data.Card;
             logger.LogError($"NOW VALIDATING: {response}");
@@ -419,7 +420,6 @@ namespace BetterTrelloAutomator.AzureFunctions
             try
             {
 
-                //we should object lock this to be safe
                 if (response.Action.Type != "updateCard" || response!.Action.MemberCreator.FullName.Contains("Bot", StringComparison.OrdinalIgnoreCase)) return req.CreateResponse(HttpStatusCode.PreconditionFailed);
 
             }
