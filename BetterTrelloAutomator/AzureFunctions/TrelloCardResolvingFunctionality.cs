@@ -240,7 +240,8 @@ namespace BetterTrelloAutomator.AzureFunctions
                         }
 
 
-                        if (checkItemDay == null)
+                        //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
+                        if (checkItemDay == null || checkItemDay < cardDay)
                         {
                             if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
                         }
@@ -250,19 +251,16 @@ namespace BetterTrelloAutomator.AzureFunctions
                         }
                         releventPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
 
-                        if (isStrict || cardDay <= checkItemDay) //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
+                        if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                         {
-                            if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
+                            if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
                             {
-                                if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
-                                {
-                                    lastSkippedDay = checkItemDay;
-                                    continue; // Skipping the first card for the set day if it's nighttime
-                                }
-                                tasksToDo.Add(client.CompleteCheckItem(card, currItem));
+                                lastSkippedDay = checkItemDay;
+                                continue; // Skipping the first card for the set day if it's nighttime
                             }
-                            incompleteCount++;
+                            tasksToDo.Add(client.CompleteCheckItem(card, currItem));
                         }
+                        incompleteCount++;
                     }
 
                     if (isDivided)
