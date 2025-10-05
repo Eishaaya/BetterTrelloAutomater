@@ -340,7 +340,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                     //Completing items when we're not resolving a card that was left until the next week
                     if (!simplyEndTask)
                     {
-                        tasksToDo = [TryCompleteItems()];
+                        tasksToDo.Add(TryCompleteItems());
                     }
 
                     var cloningCard = client.CloneCard(newCard, Lists[movingIndex]);
@@ -348,6 +348,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                     if (isReverse)
                     {
                         var clonedCard = await cloningCard;
+                        logger.LogInformation($"Completing items of card {clonedCard.Name}, {clonedCard.Id} cloned from parent {card.Id}");
                         tasksToDo.Add(TryCompleteItems(clonedCard));
                     }
                     else
