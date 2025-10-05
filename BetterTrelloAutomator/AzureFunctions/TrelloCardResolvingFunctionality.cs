@@ -210,6 +210,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                 var endingSaturday = due + TimeSpan.FromDays(DayOfWeek.Saturday - due.DayOfWeek);
                 bool simplyEndTask = todayDate.Date > endingSaturday;
 
+                logger.LogInformation($"Simply Ending: {simplyEndTask}, Ending Saturday is {endingSaturday} and Today's Acting Date is {todayDate}");
 
                 #endregion
 
@@ -223,8 +224,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                     foreach (var checkList in card.Checklists)
                     {
                         int incompleteCount = totalIncompleteCount;
-                        DayOfWeek? releventPreviousDay = null;
-
+                        DayOfWeek? relevantPreviousDay = null;
                         DayOfWeek? lastSkippedDay = null;
 
                         foreach (var currItem in checkList.CheckItems)
@@ -234,7 +234,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                             if (currItem.State != CheckItem.Incomplete)
                             {
                                 lastSkippedDay = checkItemDay;
-                                releventPreviousDay = null;
+                                relevantPreviousDay = null;
                                 continue;
                             }
 
@@ -244,11 +244,11 @@ namespace BetterTrelloAutomator.AzureFunctions
                             {
                                 if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
                             }
-                            else if (checkItemDay == releventPreviousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
+                            else if (checkItemDay == relevantPreviousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
                             {
                                 incompleteCount--;
                             }
-                            releventPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
+                            relevantPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
 
                             if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
                             {
@@ -303,6 +303,8 @@ namespace BetterTrelloAutomator.AzureFunctions
                 bool isDaily = card.Labels.ContainsName(TrelloLabel.Daily);
                 bool isReverse = card.Labels.ContainsName(TrelloLabel.Reverse);
                 int movingIndex = isDaily ? GetIndexToMoveTo(newCard) : boardInfo.WindDownIndex;
+
+                logger.LogInformation($"Card {card.Name} complete? {complete}");
 
                 if (!complete)
                 {

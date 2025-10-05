@@ -35,7 +35,7 @@ namespace BetterTrelloAutomator
 
             builder.Logging
                 .AddConsole()
-                .SetMinimumLevel(environment == "DEBUG"? LogLevel.Information : LogLevel.Warning);
+                .SetMinimumLevel(environment == "DEBUG"? LogLevel.Information : LogLevel.Information);
 
 
             builder.Build().Run();
