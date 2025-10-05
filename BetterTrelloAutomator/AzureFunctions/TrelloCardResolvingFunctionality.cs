@@ -208,9 +208,9 @@ namespace BetterTrelloAutomator.AzureFunctions
                 int totalIncompleteCount = 0;
 
                 var endingSaturday = due + TimeSpan.FromDays(DayOfWeek.Saturday - due.DayOfWeek);
-                bool simplyEndTask = todayDate.Date > endingSaturday;
+                bool simplyEndTask = todayDate.Date > endingSaturday.Date;
 
-                logger.LogInformation($"Simply Ending: {simplyEndTask}, Ending Saturday is {endingSaturday} and Today's Acting Date is {todayDate}");
+                logger.LogInformation($"Simply Ending: {simplyEndTask}, Ending Saturday is {endingSaturday.Date} and Today's Acting Date is {todayDate.Date}");
 
                 #endregion
 
