@@ -284,13 +284,16 @@ namespace BetterTrelloAutomator.AzureFunctions
                 {
                     TrySetDates();
                 }
-                if (isDivided)
+                if (!simplyEndTask)
                 {
-                    TryPushDates(.5 + extraDayOffset);
-                }
-                else
-                {
-                    TryPushDates(1);
+                    if (isDivided)
+                    {
+                        TryPushDates(.5 + extraDayOffset);
+                    }
+                    else
+                    {
+                        TryPushDates(1);
+                    }
                 }
 
 
@@ -298,10 +301,15 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 #region Movement/Cloning
 
-                var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
-
                 bool isDaily = card.Labels.ContainsName(TrelloLabel.Daily);
                 bool isReverse = card.Labels.ContainsName(TrelloLabel.Reverse);
+                
+                if (isReverse)
+                {
+                    due += TimeSpan.FromDays(DayOfWeek.Saturday - due.Date.DayOfWeek);
+                }
+
+                var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
                 int movingIndex = isDaily ? GetIndexToMoveTo(newCard) : boardInfo.WindDownIndex;
 
                 logger.LogInformation($"Card {card.Name} complete? {complete}");
@@ -348,6 +356,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                     if (isReverse)
                     {
                         var clonedCard = await cloningCard;
+                        clonedCard = await client.GetCard<FullTrelloCard>(clonedCard.Id);
                         logger.LogInformation($"Completing items of card {clonedCard.Name}, {clonedCard.Id} cloned from parent {card.Id}");
                         tasksToDo.Add(TryCompleteItems(clonedCard));
                     }
