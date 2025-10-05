@@ -1,20 +1,10 @@
 ﻿using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace BetterTrelloAutomator.AzureFunctions
 {
@@ -99,16 +89,17 @@ namespace BetterTrelloAutomator.AzureFunctions
                 return false;
             }
 
-            Task TryCompleteItems() //Complete all items until reaching already completed ones. This reduces API calls & leaves intentional blanks alive
+            Task TryCompleteItems(FullTrelloCard? changingCard = null) //Complete all items until reaching already completed ones. This reduces API calls & leaves intentional blanks alive
             {
+                changingCard ??= card;
                 List<Task> checks = [];
-                foreach (var checklist in card.Checklists)
+                foreach (var checklist in changingCard.Checklists)
                 {
                     for (int i = checklist.CheckItems.Count - 1; i >= 0; i--)
                     {
                         if (checklist.CheckItems[i].State == CheckItem.Complete) break;
 
-                        checks.Add(client.CompleteCheckItem(card, checklist.CheckItems[i]));
+                        checks.Add(client.CompleteCheckItem(changingCard, checklist.CheckItems[i]));
                     }
                 }
                 return Task.WhenAll(checks);
@@ -137,6 +128,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
             if (card.Labels.ContainsTime(out var time, TrelloLabel.Monthly, TrelloLabel.Biweekly, TrelloLabel.Weekly))
             {
+
                 #region Periodic Tasks
 
                 #region Setup
@@ -215,81 +207,90 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 int totalIncompleteCount = 0;
 
+                var endingSaturday = due + TimeSpan.FromDays(DayOfWeek.Saturday - due.DayOfWeek);
+                bool simplyEndTask = todayDate.Date > endingSaturday;
+
+
                 #endregion
 
                 #region Handle Checklist
 
                 DayOfWeek cardDay = boardInfo.Now >= knownDate ? todayDate.DayOfWeek : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
 
-                foreach (var checkList in card.Checklists)
+                if (!simplyEndTask)
                 {
-                    int incompleteCount = totalIncompleteCount;
-                    DayOfWeek? releventPreviousDay = null;
-
-                    DayOfWeek? lastSkippedDay = null;
-
-                    foreach (var currItem in checkList.CheckItems)
+                    foreach (var checkList in card.Checklists)
                     {
-                        var checkItemDay = currItem.Name.AsDayOfWeek();
+                        int incompleteCount = totalIncompleteCount;
+                        DayOfWeek? releventPreviousDay = null;
 
-                        if (currItem.State != CheckItem.Incomplete)
-                        {
-                            lastSkippedDay = checkItemDay;
-                            releventPreviousDay = null;
-                            continue;
-                        }
+                        DayOfWeek? lastSkippedDay = null;
 
+                        foreach (var currItem in checkList.CheckItems)
+                        {
+                            var checkItemDay = currItem.Name.AsDayOfWeek();
 
-                        //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
-                        if (checkItemDay == null || checkItemDay < cardDay)
-                        {
-                            if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
-                        }
-                        else if (checkItemDay == releventPreviousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
-                        {
-                            incompleteCount--;
-                        }
-                        releventPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
-
-                        if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
-                        {
-                            if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
+                            if (currItem.State != CheckItem.Incomplete)
                             {
                                 lastSkippedDay = checkItemDay;
-                                continue; // Skipping the first card for the set day if it's nighttime
+                                releventPreviousDay = null;
+                                continue;
                             }
-                            tasksToDo.Add(client.CompleteCheckItem(card, currItem));
+
+
+                            //Only allowed to mark previous days if we're in a strict task like stretching, which carries over, otherwise we are allowed to mark current or future days (if all current days are checked)
+                            if (checkItemDay == null || checkItemDay < cardDay)
+                            {
+                                if (!isStrict) continue; //Skipping non-weekday marked items except on strict cards which are allowed to handle them
+                            }
+                            else if (checkItemDay == releventPreviousDay && !isDivided) //Allowing side-by-side checkItems marked for the same day to be checked together, except when they're representing two separate occasions
+                            {
+                                incompleteCount--;
+                            }
+                            releventPreviousDay = checkItemDay; //Null days will never be counted even if stored, so this is harmless
+
+                            if (incompleteCount <= 0) //If we haven't completed more than one "bunch" of cards
+                            {
+                                if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
+                                {
+                                    lastSkippedDay = checkItemDay;
+                                    continue; // Skipping the first card for the set day if it's nighttime
+                                }
+                                tasksToDo.Add(client.CompleteCheckItem(card, currItem));
+                            }
+                            incompleteCount++;
                         }
-                        incompleteCount++;
+
+
+                        if (isDivided)
+                        {
+                            totalIncompleteCount += incompleteCount; //Making it so divided tasks only check one item on all lists
+                        }
+
+                        logger.LogInformation("Checklist {checklist} had {incompleteCount} incomplete items/bunches", checkList.Name, incompleteCount);
+                        complete &= incompleteCount <= 1;
                     }
 
-                    if (isDivided)
-                    {
-                        totalIncompleteCount += incompleteCount; //Making it so divided tasks only check one item on all lists
-                    }
 
-                    logger.LogInformation("Checklist {checklist} had {incompleteCount} incomplete items/bunches", checkList.Name, incompleteCount);
-                    complete &= incompleteCount <= 1;
+                    #endregion
+
+                    #region Dates
                 }
+                bool isDividing = isDivided && todayDate.TimeOfDay < boardInfo.TonightStart.TimeOfDay && totalIncompleteCount > 1;
 
-                #endregion
-
-                #region Dates
-
-                bool isDivididing = isDivided && todayDate.TimeOfDay < boardInfo.TonightStart.TimeOfDay && totalIncompleteCount > 1;
-
+                if (!isStrict)
+                {
+                    TrySetDates();
+                }
                 if (isDivided)
                 {
                     TryPushDates(.5);
                 }
                 else
                 {
-                    if (!isStrict)
-                    {
-                        TrySetDates();
-                    }
                     TryPushDates(1);
                 }
+
 
                 #endregion
 
@@ -298,13 +299,14 @@ namespace BetterTrelloAutomator.AzureFunctions
                 var newCard = new SimpleTrelloCard(card.Name, card.Id, start, due, false);
 
                 bool isDaily = card.Labels.ContainsName(TrelloLabel.Daily);
+                bool isReverse = card.Labels.ContainsName(TrelloLabel.Reverse);
                 int movingIndex = isDaily ? GetIndexToMoveTo(newCard) : boardInfo.WindDownIndex;
 
                 if (!complete)
                 {
                     logger.LogInformation("Card is not complete");
 
-                    if (isDivididing) //If a divided task is incomplete  
+                    if (isDividing) //If a divided task is incomplete  
                     {
                         logger.LogInformation("Moving incomplete divided task to tonight");
                         tasksToDo.Add(client.UpdateCard(newCard, new(Lists[boardInfo.TonightIndex].Id, "bottom"))); //Moving to tonight, but not applying any date changes
@@ -330,11 +332,26 @@ namespace BetterTrelloAutomator.AzureFunctions
                     tasksToDo.Add(client.MoveCard(card, Lists[boardInfo.RoutineIndex]));
 
                     logger.LogInformation("Moving cloned card {newCard} to {movingIndex}", newCard, movingIndex);
-                    tasksToDo.Add(client.CloneCard(newCard, Lists[movingIndex]));
+
+                    //Completing items when we're not resolving a card that was left until the next week
+                    if (!simplyEndTask)
+                    {
+                        tasksToDo = [TryCompleteItems()];
+                    }
+
+                    var cloningCard = client.CloneCard(newCard, Lists[movingIndex]);
+                    //Filling up reversed cards so user must untick them instead of tick
+                    if (isReverse)
+                    {
+                        var clonedCard = await cloningCard;
+                        tasksToDo.Add(TryCompleteItems(clonedCard));
+                    }
+                    else
+                    {
+                        tasksToDo.Add(cloningCard);
+                    }
 
                     await Task.WhenAll(tasksToDo);
-
-                    tasksToDo = [TryCompleteItems()];
                 }
                 #endregion
 

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -96,14 +97,15 @@ namespace BetterTrelloAutomator.Dependencies
         Task PutValue<TRecord>(string uri, TRecord contentRecord, bool ignoreContent = false, params StringPair[] otherChanges) where TRecord : SimpleTrelloRecord => PutValue(uri, contentRecord, ignoreContent, otherChanges.AsEnumerable());
 
 
-        async Task PostValue(string uri, IEnumerable<StringPair> content)
+        async Task<HttpResponseMessage> PostValue(string uri, IEnumerable<StringPair> content)
         {
             uri.EnsureUriFormat();
 
             var response = await client.PostAsync($"{uri}{authString}", new FormUrlEncodedContent(content));
             response.EnsureSuccessStatusCode();
+            return response;
         }
-        Task PostValue(string uri, params StringPair[] content) => PostValue(uri, content.AsEnumerable());
+        Task<HttpResponseMessage> PostValue(string uri, params StringPair[] content) => PostValue(uri, content.AsEnumerable());
 
 
         #endregion
@@ -166,10 +168,12 @@ namespace BetterTrelloAutomator.Dependencies
             }
         }
 
-        internal async Task CloneCard(SimpleTrelloCard card, TrelloListPosition pos)
+        internal async Task<FullTrelloCard> CloneCard(SimpleTrelloCard card, TrelloListPosition pos)
         {
-            await PostValue($"cards?idList={pos.IdList}&idCardSource={card.Id}&dueComplete=false&due={card.Due}&start={card.Start}&" +
+            var message = await PostValue($"cards?idList={pos.IdList}&idCardSource={card.Id}&dueComplete=false&due={card.Due}&start={card.Start}&" +
                 $"keepFromSource=attachments,checklists,customFields,comments,labels,members,stickers&");
+
+            return await message.Content.ReadFromJsonAsync<FullTrelloCard>() ?? throw new Exception("BUG: Should never be null, means template card does not exist.");
         }
 
 
