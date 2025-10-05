@@ -217,6 +217,7 @@ namespace BetterTrelloAutomator.AzureFunctions
 
                 DayOfWeek cardDay = boardInfo.Now >= knownDate ? todayDate.DayOfWeek : knownDate.DayOfWeek; //Doing day-based judgements based off today or the card's startdate (if it begins after today)
 
+                double extraDayOffset = 0;
                 if (!simplyEndTask)
                 {
                     foreach (var checkList in card.Checklists)
@@ -254,6 +255,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                                 if (isDivided && todayDate.TimeOfDay >= boardInfo.TonightStart.TimeOfDay && lastSkippedDay != checkItemDay)
                                 {
                                     lastSkippedDay = checkItemDay;
+                                    extraDayOffset = .5;
                                     continue; // Skipping the first card for the set day if it's nighttime
                                 }
                                 tasksToDo.Add(client.CompleteCheckItem(card, currItem));
@@ -284,7 +286,7 @@ namespace BetterTrelloAutomator.AzureFunctions
                 }
                 if (isDivided)
                 {
-                    TryPushDates(.5);
+                    TryPushDates(.5 + extraDayOffset);
                 }
                 else
                 {
